@@ -1,0 +1,29 @@
+[package]
+name = "ghosh-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "ghosh_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+ghosh-core = { path = "../crates/ghosh-core" }
+ghosh-term = { path = "../crates/ghosh-term" }
+ghosh-ssh = { path = "../crates/ghosh-ssh" }
+libc = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+uuid = { version = "1", features = ["v4"] }
+tauri = { version = "2", features = [] }
+rfd = "0.15"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
+
+[dev-dependencies]
+tempfile = "3"

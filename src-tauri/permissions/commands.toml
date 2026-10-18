@@ -1,0 +1,23 @@
+[[permission]]
+identifier = "allow-workspace"
+description = "Manage workspaces from the local main shell."
+commands.allow = ["workspace_open", "workspace_create", "workspace_snapshot", "workspace_rename", "workspace_reload", "workspace_trust", "workspace_pick", "workspace_recent", "workspace_pending"]
+
+[[permission]]
+identifier = "allow-operations"
+description = "Read native jobs and review existing approvals from the local main shell."
+commands.allow = ["operations_snapshot", "jobs_cancel", "approvals_decide"]
+
+[[permission]]
+identifier = "allow-inventory"
+description = "Review and edit typed node inventory from the local main shell."
+commands.allow = ["nodes_list", "nodes_preview", "nodes_commit", "node_connection_preview", "node_connection_test"]
+
+[[permission]]
+identifier = "allow-keys"
+description = "Review file-key metadata and register explicit user-selected files from the local main shell."
+commands.allow = ["keys_list", "keys_preview", "keys_commit", "keys_default", "keys_forget", "keys_pick", "keys_generate", "keys_relink", "workspace_key", "workspace_key_preview", "workspace_key_commit", "node_identity"]
+[[permission]]
+identifier = "allow-terminal"
+description = "Open explicit local PTY sessions from the local main shell."
+commands.allow = ["terminal_open_local", "terminal_poll", "terminal_input", "terminal_resize", "terminal_close"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-keys-commit"
+description = "Enables the keys_commit command without any pre-configured scope."
+commands.allow = ["keys_commit"]
+
+[[permission]]
+identifier = "deny-keys-commit"
+description = "Denies the keys_commit command without any pre-configured scope."
+commands.deny = ["keys_commit"]

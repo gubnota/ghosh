@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-keys-preview"
+description = "Enables the keys_preview command without any pre-configured scope."
+commands.allow = ["keys_preview"]
+
+[[permission]]
+identifier = "deny-keys-preview"
+description = "Denies the keys_preview command without any pre-configured scope."
+commands.deny = ["keys_preview"]

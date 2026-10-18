@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-keys-pick"
+description = "Enables the keys_pick command without any pre-configured scope."
+commands.allow = ["keys_pick"]
+
+[[permission]]
+identifier = "deny-keys-pick"
+description = "Denies the keys_pick command without any pre-configured scope."
+commands.deny = ["keys_pick"]

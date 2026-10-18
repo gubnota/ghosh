@@ -1,0 +1,273 @@
+{
+  "captured": "2026-10-18",
+  "source": "https://ghosh-herd-os.base44.app/",
+  "method": "Requested in-app Browser; rendered reference application, original capture bytes",
+  "kind": "Base44 prototype reference; not native Ghosh implementation evidence",
+  "limits": "UI observations only; no backend/source audit, credentials uploaded or real execution verified.",
+  "screenshots": [
+    {
+      "file": "screenshots/01-welcome.jpg",
+      "title": "Welcome and recent workspaces",
+      "width": 734,
+      "height": 975,
+      "bytes": 69119,
+      "sha256": "eceac7ad06724e70cab967e3f54cee710e89973ee60d6bb36867a1b6cc79240a"
+    },
+    {
+      "file": "screenshots/02-command-popup.jpg",
+      "title": "Command popup and catalog",
+      "width": 734,
+      "height": 975,
+      "bytes": 37807,
+      "sha256": "0b1d5ce28e2500455f937b42a8df5ce4fc0de6b036c0b9df76e2097a46993fd3"
+    },
+    {
+      "file": "screenshots/03-overview.jpg",
+      "title": "Workspace overview",
+      "width": 734,
+      "height": 975,
+      "bytes": 69669,
+      "sha256": "531cfa60a5ca99849760cb53e9adb0cdda1bcfb6e264f08f9348db84c0ba3b99"
+    },
+    {
+      "file": "screenshots/04-nodes.jpg",
+      "title": "Node inventory",
+      "width": 734,
+      "height": 975,
+      "bytes": 53768,
+      "sha256": "67b18fc4022b29f515fe783789fe52b6ca2bf55e317c8524b5de683813470124"
+    },
+    {
+      "file": "screenshots/05-add-node.jpg",
+      "title": "Add node form",
+      "width": 734,
+      "height": 975,
+      "bytes": 40131,
+      "sha256": "65929191b993b6409775eeff866149af161ec7b0baa8674bea64ece525fb1065"
+    },
+    {
+      "file": "screenshots/06-node-detail.jpg",
+      "title": "Node details",
+      "width": 734,
+      "height": 975,
+      "bytes": 55263,
+      "sha256": "e318f19fb447dcdad2f457315bffb399093045c1a0611bb184b629917ed2ed0d"
+    },
+    {
+      "file": "screenshots/07-open-terminal.jpg",
+      "title": "Open terminal form",
+      "width": 734,
+      "height": 975,
+      "bytes": 32445,
+      "sha256": "648e0187e044f6700278c8f7b607cc496ac4463a6b4528c2f13a58c9b9398bba"
+    },
+    {
+      "file": "screenshots/08-ssh-keys.jpg",
+      "title": "SSH key library",
+      "width": 734,
+      "height": 975,
+      "bytes": 77394,
+      "sha256": "6c20062373cdf83dcd88799db50edf5e869536c3446b86a42fa3726fb9c6ca6c"
+    },
+    {
+      "file": "screenshots/09-import-key.jpg",
+      "title": "Import custom key form",
+      "width": 734,
+      "height": 975,
+      "bytes": 37966,
+      "sha256": "0b97bacfc2c52e387420c1d6d50815e2a72ed1dfce9395cf33381a7338139902"
+    },
+    {
+      "file": "screenshots/10-playbooks.jpg",
+      "title": "Playbook library",
+      "width": 734,
+      "height": 975,
+      "bytes": 54503,
+      "sha256": "f756b2e88506189eeb3d83960a8a0c23c3cf5d8130ea16822ed8076e3a09992c"
+    },
+    {
+      "file": "screenshots/11-new-playbook.jpg",
+      "title": "New playbook form",
+      "width": 734,
+      "height": 975,
+      "bytes": 36771,
+      "sha256": "da63830a93eb5105fd61483fde417afebe5e13ac981142b3a9baceb889818a62"
+    },
+    {
+      "file": "screenshots/12-playbook-builder.jpg",
+      "title": "Playbook builder",
+      "width": 734,
+      "height": 975,
+      "bytes": 73825,
+      "sha256": "1dbcdbdc7e706906e9eab7c1ffab0ca1929cbddada61386d171f1611f997f899"
+    },
+    {
+      "file": "screenshots/13-playbook-source.jpg",
+      "title": "Playbook YAML source",
+      "width": 734,
+      "height": 975,
+      "bytes": 86417,
+      "sha256": "339a4891d6a44925cfdd5f5e000587708043196dd58ac77d064f2e572daaac0b"
+    },
+    {
+      "file": "screenshots/14-run-plan.jpg",
+      "title": "Run plan and review",
+      "width": 734,
+      "height": 975,
+      "bytes": 77492,
+      "sha256": "1201f50f045e6086ca20eae1dfeb805931c0b597dc4b0d8a3310ad17632873e5"
+    },
+    {
+      "file": "screenshots/15-runs.jpg",
+      "title": "Run history",
+      "width": 734,
+      "height": 975,
+      "bytes": 52064,
+      "sha256": "13126d350fd83cefc0afa15c594dcd155ad6cdeeb91620be1cfdb28f4bbbbac3"
+    },
+    {
+      "file": "screenshots/16-run-monitor.jpg",
+      "title": "Run monitor",
+      "width": 734,
+      "height": 975,
+      "bytes": 61967,
+      "sha256": "2d1aabca642fe19a48ae85315a27237e3ef0b799823a03f82e8e12f562075c46"
+    },
+    {
+      "file": "screenshots/17-browser-profiles.jpg",
+      "title": "Browser profiles",
+      "width": 1391,
+      "height": 988,
+      "bytes": 118849,
+      "sha256": "bfb65cc98a43caa1cea0ca479b4e967b056e245923dda9014246488ec70b6c09"
+    },
+    {
+      "file": "screenshots/18-tunnels.jpg",
+      "title": "Tunnels and routes",
+      "width": 1391,
+      "height": 988,
+      "bytes": 81718,
+      "sha256": "04d2cfada2077be199ceb123059d6a9af83dc49445be84217b69ef6e4a2a1653"
+    },
+    {
+      "file": "screenshots/19-certificates.jpg",
+      "title": "Certificates",
+      "width": 1391,
+      "height": 988,
+      "bytes": 102816,
+      "sha256": "592c292008e63ab6ef3e7ab4d600c7847d035935c9eb0c21c000860d72ba5acc"
+    },
+    {
+      "file": "screenshots/20-scripts.jpg",
+      "title": "Script library and capability review",
+      "width": 1391,
+      "height": 988,
+      "bytes": 84060,
+      "sha256": "f7dfd9f55d1d4544ebe0fb7d955d0b0a0d538fa8a0b96a6f039de913a99340ac"
+    },
+    {
+      "file": "screenshots/21-recordings.jpg",
+      "title": "Recordings",
+      "width": 1391,
+      "height": 988,
+      "bytes": 81750,
+      "sha256": "8ca12f9ff2364525ae042fb5d710b55894779bbe6fc5eb497948ef8d03c13b48"
+    },
+    {
+      "file": "screenshots/22-recipes.jpg",
+      "title": "ComfyUI recipes",
+      "width": 1391,
+      "height": 988,
+      "bytes": 91102,
+      "sha256": "028b859ebb4368c2edefcbb93387b30dc32214440fa8dd74a78eb46944dac1c2"
+    },
+    {
+      "file": "screenshots/23-mcp.jpg",
+      "title": "MCP server and clients",
+      "width": 1391,
+      "height": 988,
+      "bytes": 82660,
+      "sha256": "0b00fc1903ee3b51f1432aedbdbf83d2e7ce240ccc7a801f383274a58cb32f14"
+    },
+    {
+      "file": "screenshots/24-approvals.jpg",
+      "title": "Approvals inbox",
+      "width": 1391,
+      "height": 988,
+      "bytes": 93700,
+      "sha256": "e74b3b0b3c16f636d5cc1be9be70d2a55e3b9b4da8de84d758ff7829942da5aa"
+    },
+    {
+      "file": "screenshots/25-settings-appearance.jpg",
+      "title": "Appearance settings",
+      "width": 1391,
+      "height": 988,
+      "bytes": 73541,
+      "sha256": "3e9c972590aa6df956766214180f5e4b50bf455f82ecdcbc9d750d1fbe9bea55"
+    },
+    {
+      "file": "screenshots/26-keyboard-shortcuts.jpg",
+      "title": "Keyboard shortcuts",
+      "width": 1391,
+      "height": 988,
+      "bytes": 51464,
+      "sha256": "85e0154e674ca92479c88faa4a1c64665f31ece8f824cb9433bd6a6489fc8baa"
+    },
+    {
+      "file": "screenshots/27-overview-wide.jpg",
+      "title": "Overview at wide viewport",
+      "width": 1391,
+      "height": 988,
+      "bytes": 117264,
+      "sha256": "e5e2918b7564dd1c694215b392f2dbf75e0389780727f2c24e5326addad21cb0"
+    },
+    {
+      "file": "screenshots/28-create-workspace.jpg",
+      "title": "Create workspace form",
+      "width": 1391,
+      "height": 988,
+      "bytes": 54559,
+      "sha256": "48699b0e562fc9b0ae5e69d90dc4c2730b34dd6c95c724f44bc8a03338cb1f19"
+    },
+    {
+      "file": "screenshots/29-open-workspace.jpg",
+      "title": "Open workspace form",
+      "width": 1391,
+      "height": 988,
+      "bytes": 49495,
+      "sha256": "918357eaa0464fff6c42a5d9516d894a830b76f60f3b49d794b063fccc43d3ca"
+    },
+    {
+      "file": "screenshots/30-command-popup-wide.jpg",
+      "title": "Command popup at wide viewport",
+      "width": 1391,
+      "height": 988,
+      "bytes": 58218,
+      "sha256": "91f5defa0513e776ed91c7b40b4d9548ef5a3cd20d5dd3700321f7519af5207a"
+    },
+    {
+      "file": "screenshots/31-switch-route.jpg",
+      "title": "Switch route form",
+      "width": 1391,
+      "height": 988,
+      "bytes": 54916,
+      "sha256": "97e065642d6bc32ecc53fc68ed2d4b8e0dd8ca2887ab114f8345912270b3a924"
+    },
+    {
+      "file": "screenshots/32-node-filter-selection.jpg",
+      "title": "Node filtering and selection",
+      "width": 1391,
+      "height": 988,
+      "bytes": 68513,
+      "sha256": "6ce29db9a440210c49441e2b8b04e68d221080ecb2d1f551801539e37459d145"
+    },
+    {
+      "file": "screenshots/33-nodes-wide.jpg",
+      "title": "Node inventory at wide viewport",
+      "width": 1391,
+      "height": 988,
+      "bytes": 83997,
+      "sha256": "cd349f4b120479c3d96fc63cdd4e3b123df321bfb705eb7864a00f68d24e0aa4"
+    }
+  ]
+}

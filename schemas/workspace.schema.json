@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Manifest",
+  "type": "object",
+  "properties": {
+    "mcp": {
+      "$ref": "#/$defs/Mcp",
+      "default": {
+        "enabled": false,
+        "read_only": true,
+        "require_approval": [
+          "node.exec",
+          "node.run",
+          "profile.open_tab",
+          "page.eval",
+          "page.click",
+          "page.type",
+          "page.run",
+          "cert.issue",
+          "cert.sync",
+          "recipe.apply",
+          "script.run",
+          "term.run"
+        ]
+      }
+    },
+    "paths": {
+      "$ref": "#/$defs/Paths",
+      "default": {
+        "certs": "certs",
+        "data": "data",
+        "nodes": "nodes",
+        "playbooks": "playbooks",
+        "profiles": "profiles",
+        "recipes": "recipes",
+        "recordings": "recordings",
+        "scripts": "scripts",
+        "state": "state",
+        "templates": "templates",
+        "tunnels": "tunnels"
+      }
+    },
+    "schema": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 1
+    },
+    "workspace": {
+      "$ref": "#/$defs/WorkspaceMetadata"
+    }
+  },
+  "required": [
+    "schema",
+    "workspace"
+  ],
+  "$defs": {
+    "Mcp": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "read_only": {
+          "type": "boolean",
+          "default": true
+        },
+        "require_approval": {
+          "type": "array",
+          "default": [
+            "node.exec",
+            "node.run",
+            "profile.open_tab",
+            "page.eval",
+            "page.click",
+            "page.type",
+            "page.run",
+            "cert.issue",
+            "cert.sync",
+            "recipe.apply",
+            "script.run",
+            "term.run"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Paths": {
+      "type": "object",
+      "properties": {
+        "certs": {
+          "type": "string",
+          "default": "certs"
+        },
+        "data": {
+          "type": "string",
+          "default": "data"
+        },
+        "nodes": {
+          "type": "string",
+          "default": "nodes"
+        },
+        "playbooks": {
+          "type": "string",
+          "default": "playbooks"
+        },
+        "profiles": {
+          "type": "string",
+          "default": "profiles"
+        },
+        "recipes": {
+          "type": "string",
+          "default": "recipes"
+        },
+        "recordings": {
+          "type": "string",
+          "default": "recordings"
+        },
+        "scripts": {
+          "type": "string",
+          "default": "scripts"
+        },
+        "state": {
+          "type": "string",
+          "default": "state"
+        },
+        "templates": {
+          "type": "string",
+          "default": "templates"
+        },
+        "tunnels": {
+          "type": "string",
+          "default": "tunnels"
+        }
+      }
+    },
+    "WorkspaceMetadata": {
+      "type": "object",
+      "properties": {
+        "created": {
+          "type": "string"
+        },
+        "default_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default_tunnel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "id",
+        "created"
+      ]
+    }
+  }
+}

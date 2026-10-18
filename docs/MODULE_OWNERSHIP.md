@@ -1,0 +1,75 @@
+# Module ownership
+
+Status: workspace/node/key persistence, Nightfly shell, jobs/approvals, local PTY and reviewed direct SSH authentication implemented.
+Execution services below are future boundaries, not existing modules.
+
+## Implemented ownership
+| Owner | Responsibility | Allowed dependencies |
+| --- | --- | --- |
+| ghosh-core/contracts | Safe DTOs/errors and cancellation primitive | Portable serde/TS tooling |
+| ghosh-core/operations, approvals | Bounded job metadata; exact native request/grant policy and audit | Core contracts/policy/portable identity/hash/time |
+| ghosh-core/policy | Human edit authorization, secret-service access, mandatory approval set | Core contracts/portable identity |
+| ghosh-core/secrets | Zeroized values, reference validation, SecretStore port | Core policy/contracts; no platform APIs |
+| ghosh-core/workspace | TOML validation/patches, references, leases, revision/atomic persistence, watcher/trust | Core contracts/policy and portable filesystem libraries |
+| src-tauri/services | Active workspace/watch, recent/open queue, jobs and fresh-disk approval decisions | Core; Tauri events; injected queue |
+| src-tauri/commands | Local caller check and typed IPC; offload blocking work | Services/core and native file dialog |
+| ghosh-core/ssh_keys | User-local registry, safe files, key metadata and precedence | Portable filesystem/crypto; injected generator/inspector |
+| ghosh-ssh | Direct SSH handshake, known-host verification/algorithm preference and authentication; no workspace/UI policy | Core SSH DTOs; ssh2/crypto |
+| src-tauri/services/ssh | Trusted fresh context, bounded single-use review tickets, native-only key resolution | Core, ghosh-ssh, active workspace serialization |
+| ghosh-term | Local PTY sessions, bounded replay/input, resize and child cleanup | Core terminal DTOs; portable-pty/libc |
+| src-tauri/platform | OpenSSH key adapters; separate workspace-scoped Keychain adapter | Core key ports/SecretStore; native tools/framework |
+| src-tauri/lib.rs | Desktop composition; queue exists before setup/native Opened events | Shell/core |
+| React src | Presentation, drafts/dialogs/busy/error state and event coordination | Generated DTOs and typed src/app/ipc.ts |
+
+- App shell owns command registry, accessible modal focus and shortcut dispatch;
+  commands use the same typed services as controls, never shell eval.
+
+## Dependency and communication rules
+- Adapters depend inward on core-owned contracts/ports; core never imports Tauri/React.
+- Native Keychain values cannot cross desktop IPC; only native services receive SecretStore.
+- UI cannot implement storage validation, raw key resolution, process spawning or SSH execution.
+- Terminal UI necessarily carries user-entered PTY bytes; it never receives private key files.
+- ghosh-term owns shell/process lifecycle; React owns emulator parsing and acknowledgement.
+- Rust rechecks caller identity, workspace ID, revision and filesystem state for edits.
+- No filesystem work on the UI thread; commands offload it to blocking workers.
+- Services serialize active-workspace mutations; watcher callbacks emit safe invalidation hints.
+- Document-open events queue before initialization; they do not load/execute packages directly.
+- Frontend subscribes before draining; unsaved changes gate switching/reload/close.
+- Remote/page/external MCP output stays untrusted data, never executable instructions.
+- Keep peer adapters acyclic; cross-service work uses injected core ports/handles.
+
+## Future ownership
+- Extend ghosh-ssh: jumps/pool/channels/SFTP/PTY and persistent host enrollment; core/route ports.
+- Existing file-key registry/adapter stays separate from Keychain-only SecretStore.
+  Memory-only encrypted unlock is pending; managed unencrypted-key authentication works.
+
+- ghosh-tunnel: route generations/leases/sidecars/health; core/platform process bindings.
+- ghosh-webview: UUID store lifecycle, every native multiwebview type and page operation.
+- Only ghosh-webview may use multiwebview APIs, behind WebviewProfileBackend.
+- Extend existing ghosh-term through injected SSH/core ports for managed per-node PTYs.
+  Terminal input ownership and reserved app shortcuts are explicit in the shell.
+- Native terminal smoke owns local shell/full-screen/resize/signals; SSH fixtures
+  separately own managed PTY/auth/route/disconnect tests. Local/remote manual
+  TTY and full-screen editor smoke passed; native managed authentication passed both
+  authorized hosts. Managed remote PTY/route/disconnect acceptance remains pending.
+- ghosh-certs: issuance/deployment/TLS verification; SSH/secret ports.
+- ghosh-script/recorder/comfy: orchestration through shared core APIs, not duplicate logic.
+- ghosh-mcp/cli: protocol/command adapters; cannot bypass core policy.
+- Never hold workspace/node locks while awaiting a human approval; consume under fresh binding checks.
+- Future script subprocesses are trusted local code; binding grants are not OS isolation.
+
+## Build and testing ownership
+- Root tooling owns locked toolchain/dependencies, CI, licenses and build scripts.
+- src-tauri owns package identity, UTI, icons, ACL/CSP and future signing/notarization.
+- Core exporter owns generated TS/JSON Schemas; consumers never hand-edit outputs.
+- Core tests own persistence/schema/conflict/secret/policy behavior (see TASK_LOG.md for current results).
+- Shell tests own caller restrictions and early/bounded document queue and fresh-disk approval invalidation (see TASK_LOG.md for current results).
+- Native Keychain test is opt-in, creates a temporary item and cleans it up.
+- Browser fixtures own 18 UI/focus/reconciliation journeys; do not claim native effects.
+- Shared Select owns themed menus, keyboard selection/typeahead and viewport positioning.
+- Platform adapters own legacy-secret availability; Linux fails closed, file keys stay separate.
+- Release tooling owns version guards, native packaging/checksums and sequential tag-only CI.
+- Interactive smoke owns real Finder/file-dialog/dirty/trust/restart behavior and UI layout.
+- Future ghosh-webview owns two-profile/one-window cookie and routing tests.
+- Future ghosh-mcp owns protocol/Inspector B3; core owns shared execution/policy fixtures.
+- Update all six memory files and record actual checks for every milestone increment.

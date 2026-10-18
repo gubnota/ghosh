@@ -1,0 +1,106 @@
+{
+  "captured": "2026-10-18",
+  "kind": "Real native Ghosh M1.1 current-state captures; not redesigned screens",
+  "screenshots": [
+    {
+      "file": "screenshots/01-welcome.jpg",
+      "title": "Welcome and recent workspaces",
+      "source": "Current native app; recent list",
+      "current_gap": "Oversized hero; no command entry",
+      "requested_change": "Compact Nightfly start surface; Cmd+K and first-use actions",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 308081
+    },
+    {
+      "file": "screenshots/02-user-workspace.jpg",
+      "title": "Actual user workspace: overview",
+      "source": "User workspace /Users/vm/Documents/1.ghosh, read only during capture",
+      "current_gap": "No create-playbook or add-node route",
+      "requested_change": "Key \u2192 node \u2192 playbook onboarding and persistent prompt",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 210293
+    },
+    {
+      "file": "screenshots/03-workspace-details.jpg",
+      "title": "Workspace inventory, trust and diagnostics",
+      "source": "Same user workspace, no edits/trust change",
+      "current_gap": "Empty inventory; tiny labels; legacy Keychain copy",
+      "requested_change": "Readable hierarchy, actionable setup, collapsed diagnostics",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 237892
+    },
+    {
+      "file": "screenshots/04-create-workspace.jpg",
+      "title": "Create workspace dialog",
+      "source": "Current native form over user workspace",
+      "current_gap": "Current modal and font baseline",
+      "requested_change": "Keyboard focus, compact command form, readable inputs",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 156630
+    },
+    {
+      "file": "screenshots/05-unsaved-draft.jpg",
+      "title": "Unsaved name edit",
+      "source": "Disposable /private/tmp/Ghosh-Base44-1018.ghosh fixture",
+      "current_gap": "Draft state; no execution features",
+      "requested_change": "Keep draft guards across command forms and tab switching",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 244332
+    },
+    {
+      "file": "screenshots/06-open-workspace.jpg",
+      "title": "Open workspace dialog",
+      "source": "Current native form over disposable fixture",
+      "current_gap": "Current picker/path-entry baseline",
+      "requested_change": "Keyboard-only picker plus validation and focus return",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 152432
+    },
+    {
+      "file": "screenshots/07-external-conflict.jpg",
+      "title": "External edit while draft is unsaved",
+      "source": "Disposable fixture; edited externally for capture",
+      "current_gap": "Save paused and conflict notice",
+      "requested_change": "Keyboard comparison, explicit resolve/reload/save",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 261958
+    },
+    {
+      "file": "screenshots/08-discard-confirmation.jpg",
+      "title": "Discard draft and reload confirmation",
+      "source": "Disposable fixture only",
+      "current_gap": "Current destructive dialog styling",
+      "requested_change": "Cancel-first focus; preserve draft on dismissal",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 148052
+    },
+    {
+      "file": "screenshots/09-trust-confirmation.jpg",
+      "title": "Workspace trust confirmation",
+      "source": "Disposable fixture; confirmation cancelled",
+      "current_gap": "Current trust sheet; no actual run",
+      "requested_change": "Clear scope; keyboard-safe affirmative action",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 146016
+    },
+    {
+      "file": "screenshots/10-node-inventory.jpg",
+      "title": "Populated read-only node inventory",
+      "source": "Disposable fixture; two fictional documentation IPs, no connection",
+      "current_gap": "No add/edit/test/terminal/run actions",
+      "requested_change": "Node actions, effective key, route and real per-node terminal entry",
+      "width": 2320,
+      "height": 1560,
+      "bytes": 260067
+    }
+  ]
+}

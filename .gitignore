@@ -1,2 +1,11 @@
 .DS_Store
-
+docs/ghosh-prompt.md
+/target/
+/node_modules/
+/dist/
+/.cache/
+/src-tauri/gen/
+*.local
+/test-results/
+/playwright-report/
+/artifacts/

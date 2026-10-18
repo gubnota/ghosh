@@ -1,0 +1,296 @@
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+0 AXWebArea Ghosh, URL: ghosh-herd-os.base44.app/
+	1 container root
+		2 container
+			3 button g ghosh.
+				4 text g
+				5 text ghosh.
+			6 text / Homelab
+			7 button Open command popup
+				8 text ghosh >
+				9 text ⌘K
+			10 button 1, Help: Background jobs
+				11 image
+				12 text 1
+			13 button 1, Help: Approvals inbox
+				14 image
+				15 text 1
+		16 container
+			17 button H Homelab Local workspace
+				18 text H
+				19 text Homelab
+				20 text Local workspace
+			21 text WORKSPACE
+			22 button Overview
+				23 image
+				24 text Overview
+				25 image
+			26 text INFRASTRUCTURE
+			27 button Nodes
+				28 image
+				29 text Nodes
+				30 image
+			31 button Playbooks
+				32 image
+				33 text Playbooks
+				34 image
+			35 button Runs
+				36 image
+				37 text Runs
+				38 image
+			39 button SSH Keys
+				40 image
+				41 text SSH Keys
+				42 image
+			43 button Browser Profiles
+				44 image
+				45 text Browser Profiles
+				46 image
+			47 button Tunnels
+				48 image
+				49 text Tunnels
+				50 image
+			51 button Certificates
+				52 image
+				53 text Certificates
+				54 image
+			55 button Scripts
+				56 image
+				57 text Scripts
+				58 image
+			59 button Recordings
+				60 image
+				61 text Recordings
+				62 image
+			63 button ComfyUI Recipes
+				64 image
+				65 text ComfyUI Recipes
+				66 image
+			67 button MCP
+				68 image
+				69 text MCP
+				70 image
+			71 text SYSTEM
+			72 button Approvals 1
+				73 image
+				74 text Approvals
+				75 text 1
+				76 image
+			77 button Settings
+				78 image
+				79 text Settings
+				80 image
+			81 text Local by design
+			82 text Workspace foundation · v0.1.0
+		83 container
+			84 tab group Open tabs
+				85 tab (selected, settable, boolean) ◐ Get started Close Get started tab, Description: Close Get started tab, Value: 1
+◐
+Get started
+			86 text YOUR INFRASTRUCTURE, TOGETHER
+			87 heading Everything starts with a workspace., Value: 1
+				88 text Everything starts with a workspace.
+			89 text One local home for your connections, automation, and browser profiles. Yours to keep. Yours to control.
+			90 button Create workspace
+				91 image
+				92 text Create workspace
+			93 button Open existing
+				94 image
+				95 text Open existing
+			96 image
+			97 text Local files. No account required.
+			98 button Add a node Pick an SSH key, then enroll edge1. node add
+				99 text Add a node
+				100 text Pick an SSH key, then enroll edge1.
+				101 text node add
+			102 button Create a playbook Declarative YAML. “Scenarios” are playbooks. playbook new
+				103 text Create a playbook
+				104 text Declarative YAML. “Scenarios” are playbooks.
+				105 text playbook new
+			106 button Plan a run Resolve targets, review the diff, approve. run plan
+				107 text Plan a run
+				108 text Resolve targets, review the diff, approve.
+				109 text run plan
+			110 heading Recent workspaces, Value: 2
+				111 text Recent workspaces
+			112 text LOCAL H
+			113 button Homelab /Users/vm/Documents/Homelab.ghosh
+				114 text Homelab
+				115 text /Users/vm/Documents/Homelab.ghosh
+			116 text 2026-10-18 11:40
+			117 button Remove from recent
+				118 image
+			119 image
+			120 text E
+			121 button External native edit /private/tmp/Ghosh-Smoke-M11-1018.ghosh
+				122 text External native edit
+				123 text /private/tmp/Ghosh-Smoke-M11-1018.ghosh
+			124 text 2026-10-17 16:02
+			125 button Remove from recent
+				126 image
+			127 image
+			128 text E
+			129 button (disabled) Edge staging file missing /Users/vm/Documents/edge-staging.ghosh
+				130 text Edge staging
+				131 image
+				132 text file missing
+				133 text /Users/vm/Documents/edge-staging.ghosh
+			134 text 2026-10-12 09:15
+			135 button Remove from recent
+				136 image
+			137 image
+			138 image
+			139 text Portable by default A workspace is a folder you own. Keep it wherever you work.
+			140 image
+			141 text Trust is your choice Opening a package runs nothing. Review first, trust when ready.
+			142 image
+			143 text Built for your workflow Start with the foundation. Connections and automation come next. ●  Trusted │ route:  Direct │ save:  clean │ jobs:  1 view:  welcome │ On your machine. Under your control.
+		155 container Command popup
+			156 text ghosh >
+			157 image
+			158 text field (settable) Command input
+			159 text esc
+			160 container
+				161 button Open workspace Open an existing .ghosh package WORKSPACE ⌘O
+					162 image
+					163 text Open workspace
+					164 text Open an existing .ghosh package
+					165 text WORKSPACE
+					166 text ⌘O
+				167 button Create workspace New local .ghosh package WORKSPACE
+					168 image
+					169 text Create workspace
+					170 text New local .ghosh package
+					171 text WORKSPACE
+				172 button Add node Focused add-node form NODES ⌘N
+					173 image
+					174 text Add node
+					175 text Focused add-node form
+					176 text NODES
+					177 text ⌘N
+				178 button Edit node node edit <name> NODES
+					179 image
+					180 text Edit node
+					181 text node edit <name>
+					182 text NODES
+				183 button Test connection node test <name> NODES
+					184 image
+					185 text Test connection
+					186 text node test <name>
+					187 text NODES
+				188 button Use system SSH key Choose an existing ~/.ssh key file SSH KEYS
+					189 image
+					190 text Use system SSH key
+					191 text Choose an existing ~/.ssh key file
+					192 text SSH KEYS
+				193 button Import custom key Reference or copy a key SSH KEYS
+					194 image
+					195 text Import custom key
+					196 text Reference or copy a key
+					197 text SSH KEYS
+				198 button Generate SSH key Local Ed25519 generation SSH KEYS
+					199 image
+					200 text Generate SSH key
+					201 text Local Ed25519 generation
+					202 text SSH KEYS
+				203 button New playbook (scenario) Create a declarative YAML playbook PLAYBOOKS
+					204 image
+					205 text New playbook (scenario)
+					206 text Create a declarative YAML playbook
+					207 text PLAYBOOKS
+				208 button Import playbook Local YAML picker + review PLAYBOOKS
+					209 image
+					210 text Import playbook
+					211 text Local YAML picker + review
+					212 text PLAYBOOKS
+				213 button Edit playbook playbook edit <name> PLAYBOOKS
+					214 image
+					215 text Edit playbook
+					216 text playbook edit <name>
+					217 text PLAYBOOKS
+				218 button Plan run run plan <playbook> --target <node> RUNS
+					219 image
+					220 text Plan run
+					221 text run plan <playbook> --target <node>
+					222 text RUNS
+				223 button Apply run Fresh plan + approval, then run RUNS
+					224 image
+					225 text Apply run
+					226 text Fresh plan + approval, then run
+					227 text RUNS
+				228 button Open terminal terminal open <node|local> TERMINAL
+					229 image
+					230 text Open terminal
+					231 text terminal open <node|local>
+					232 text TERMINAL
+				233 button Open browser tab Pick a profile and start URL BROWSER
+					234 image
+					235 text Open browser tab
+					236 text Pick a profile and start URL
+					237 text BROWSER
+				238 button Switch route Scoped route selection BROWSER
+					239 image
+					240 text Switch route
+					241 text Scoped route selection
+					242 text BROWSER
+				243 button Renew certificate Renew due certificate CERTIFICATES
+					244 image
+					245 text Renew certificate
+					246 text Renew due certificate
+					247 text CERTIFICATES
+				248 button Apply ComfyUI recipe Plan + download queue RECIPES
+					249 image
+					250 text Apply ComfyUI recipe
+					251 text Plan + download queue
+					252 text RECIPES
+				253 button MCP server settings Enable read-only / write mode MCP
+					254 image
+					255 text MCP server settings
+					256 text Enable read-only / write mode
+					257 text MCP
+				258 button Background jobs Open jobs center SYSTEM
+					259 image
+					260 text Background jobs
+					261 text Open jobs center
+					262 text SYSTEM
+				263 button Approvals inbox Pending grants SYSTEM
+					264 image
+					265 text Approvals inbox
+					266 text Pending grants
+					267 text SYSTEM
+				268 button Settings Appearance, keys, runtimes SYSTEM
+					269 image
+					270 text Settings
+					271 text Appearance, keys, runtimes
+					272 text SYSTEM
+				273 button Keyboard shortcuts Searchable, remappable SYSTEM
+					274 image
+					275 text Keyboard shortcuts
+					276 text Searchable, remappable
+					277 text SYSTEM
+				278 button Move focus to navigation ⌘⇧E FOCUS ⌘⇧E
+					279 image
+					280 text Move focus to navigation
+					281 text ⌘⇧E
+					282 text FOCUS
+					283 text ⌘⇧E
+			284 image
+			285 image
+			286 text choose
+			287 image
+			288 text open
+			289 text esc
+			290 text back / close ⌘K toggle · ⌘⇧P alternate
+		144 container Notifications (F8)
+			145 content list
+		146 container Notifications (F8)
+			147 content list
+	148 container base44-edit-badge
+		149 image base44
+		150 container badge-content
+			151 text Edit with
+			152 image Base44
+		153 button Description: Close badge, ID: badge-close
+			154 image
+
+The focused UI element is 158 text field (settable) Command input

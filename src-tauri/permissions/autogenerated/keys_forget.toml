@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-keys-forget"
+description = "Enables the keys_forget command without any pre-configured scope."
+commands.allow = ["keys_forget"]
+
+[[permission]]
+identifier = "deny-keys-forget"
+description = "Denies the keys_forget command without any pre-configured scope."
+commands.deny = ["keys_forget"]

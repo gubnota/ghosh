@@ -1,0 +1,85 @@
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~			474 heading SSH trust, Value: 3
+~				475 text SSH trust
+The focused UI element is 441 button SSH trust
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~			474 heading SSH Keys, Value: 3
+~				475 text SSH Keys
+~			476 text Ordinary files, never macOS Keychain. Managed files use 0600; managed folders 0700.
++			477 button Use system key
+The focused UI element is 444 button SSH Keys
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 429
+~			474 heading Non-SSH secret references, Value: 3
+~				475 text Non-SSH secret references
+~			476 text Reference ID + provider + intended use. No secret-value list, reveal button or stored plaintext fixture. Add/replace/delete via native secure entry.
+~			477 image
++			478 text cf_token Cloudflare DNS challenge available
++			479 image
++			480 text vless_uri VLESS EU import locked ●  Trusted │ route:  Direct │ save:  clean │ jobs:  1 view:  settings │ On your machine. Under your control.
+The focused UI element is 447 button Other secrets
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 478-480
+~			474 heading Runtimes, Value: 3
+~				475 text Runtimes
+~			476 text Reachable settings surface. Full controls land in a later release.
+~			477 text ●  Trusted │ route:  Direct │ save:  clean │ jobs:  1 view:  settings │ On your machine. Under your control.
+The focused UI element is 450 button Runtimes
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~			474 heading Sidecars, Value: 3
+~				475 text Sidecars
+The focused UI element is 453 button Sidecars
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 474-476
++			478 heading Terminal, Value: 3
++				479 text Terminal
++			480 text Font SFMono-Regular 14px Scrollback 10000 lines Renderer canvas (status: ok) Keyboard protocol experimental (CSI u) Input/history persistence off by default Bracketed paste on · multiline paste review
++			481 text A real terminal requires a PTY/SSH channel. This prototype labels its placeholders.
+The focused UI element is 456 button Terminal
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 481
+~			478 heading Browser capabilities, Value: 3
+~				479 text Browser capabilities
+~			480 text Reachable settings surface. Full controls land in a later release.
+The focused UI element is 459 button Browser capabilities
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~			478 heading Notifications, Value: 3
+~				479 text Notifications
+The focused UI element is 462 button Notifications
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~			478 heading Storage & privacy, Value: 3
+~				479 text Storage & privacy
+The focused UI element is 465 button Storage & privacy
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~			478 heading About & capability diagnostics, Value: 3
+~				479 text About & capability diagnostics
+~			480 text App Ghosh 0.1.0 (prototype) OS macOS 14.5 (arm64) Backend native (pending) Python 3.11 (managed) Node 20.4 (managed) Licensing MIT + bundled fonts
++			481 button Copy diagnostic bundle
+The focused UI element is 468 button About / licenses
+
+Browser tab: 3, Title: "Ghosh", URL: "https://ghosh-herd-os.base44.app/".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 481
+~			478 heading Keyboard shortcuts, Value: 3
+~				479 text Keyboard shortcuts
+~			480 button Open shortcuts view
+The focused UI element is 471 button Keyboard shortcuts

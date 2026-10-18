@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-approvals-decide"
+description = "Enables the approvals_decide command without any pre-configured scope."
+commands.allow = ["approvals_decide"]
+
+[[permission]]
+identifier = "deny-approvals-decide"
+description = "Denies the approvals_decide command without any pre-configured scope."
+commands.deny = ["approvals_decide"]

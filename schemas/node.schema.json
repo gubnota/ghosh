@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Node",
+  "type": "object",
+  "properties": {
+    "auth": {
+      "$ref": "#/$defs/Auth"
+    },
+    "host": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "jump": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "labels": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "port": {
+      "type": "integer",
+      "format": "uint16",
+      "default": 22,
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "schema": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "tunnel": {
+      "type": "string",
+      "default": "direct"
+    },
+    "user": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "id",
+    "host",
+    "user",
+    "auth"
+  ],
+  "$defs": {
+    "Auth": {
+      "type": "object",
+      "properties": {
+        "agent_socket": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method": {
+          "$ref": "#/$defs/AuthMethod"
+        },
+        "password_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "method"
+      ]
+    },
+    "AuthMethod": {
+      "type": "string",
+      "enum": [
+        "key",
+        "agent",
+        "password"
+      ]
+    }
+  }
+}

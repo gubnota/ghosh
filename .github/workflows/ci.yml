@@ -1,0 +1,76 @@
+name: Tagged desktop artifacts
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+      CARGO_BUILD_JOBS: '1'
+      RUST_TEST_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify architecture and version
+        run: |
+          test "$(uname -m)" = arm64
+          node scripts/verify-release.mjs "$GITHUB_REF_NAME"
+          rustup show
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: bash scripts/check.sh
+      - run: bash scripts/build-release.sh "$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ghosh-${{ github.ref_name }}-macos-arm64-${{ github.sha }}
+          path: artifacts/**
+          if-no-files-found: error
+  linux-x86_64:
+    needs: macos-arm64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: '1'
+      RUST_TEST_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify architecture and version
+        run: |
+          test "$(uname -m)" = x86_64
+          node scripts/verify-release.mjs "$GITHUB_REF_NAME"
+          rustup show
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf xvfb
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: bash scripts/check.sh
+      - run: bash scripts/build-release.sh "$GITHUB_REF_NAME"
+      - name: Headless native startup smoke
+        run: |
+          smoke_home="$(mktemp -d)"
+          trap 'rm -rf "$smoke_home"' EXIT
+          set +e
+          HOME="$smoke_home" XDG_CONFIG_HOME="$smoke_home/config" XDG_DATA_HOME="$smoke_home/data" WEBKIT_DISABLE_DMABUF_RENDERER=1 timeout 10s xvfb-run -a target/x86_64-unknown-linux-gnu/release/ghosh-desktop > "$smoke_home/startup.log" 2>&1
+          result=$?
+          set -e
+          cat "$smoke_home/startup.log"
+          test "$result" -eq 124
+          ! grep -Ei 'panicked|fatal error' "$smoke_home/startup.log"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ghosh-${{ github.ref_name }}-linux-x86_64-${{ github.sha }}
+          path: artifacts/**
+          if-no-files-found: error

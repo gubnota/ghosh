@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-workspace-key-preview"
+description = "Enables the workspace_key_preview command without any pre-configured scope."
+commands.allow = ["workspace_key_preview"]
+
+[[permission]]
+identifier = "deny-workspace-key-preview"
+description = "Denies the workspace_key_preview command without any pre-configured scope."
+commands.deny = ["workspace_key_preview"]

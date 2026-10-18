@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-nodes-preview"
+description = "Enables the nodes_preview command without any pre-configured scope."
+commands.allow = ["nodes_preview"]
+
+[[permission]]
+identifier = "deny-nodes-preview"
+description = "Denies the nodes_preview command without any pre-configured scope."
+commands.deny = ["nodes_preview"]
