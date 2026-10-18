@@ -1391,7 +1391,7 @@ dependencies = [
 
 [[package]]
 name = "ghosh-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.21.7",
  "cap-std",
@@ -1415,7 +1415,7 @@ dependencies = [
 
 [[package]]
 name = "ghosh-desktop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ghosh-core",
  "ghosh-ssh",
@@ -1433,7 +1433,7 @@ dependencies = [
 
 [[package]]
 name = "ghosh-ssh"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.21.7",
  "ghosh-core",
@@ -1444,7 +1444,7 @@ dependencies = [
 
 [[package]]
 name = "ghosh-term"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ghosh-core",
  "libc",

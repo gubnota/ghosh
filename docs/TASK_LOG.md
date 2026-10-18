@@ -233,3 +233,13 @@
 - Publication: reviewed foundation prepared for main and annotated v0.1.0;
   observe the tag-triggered workflow before claiming remote artifact availability.
   Managed SSH PTY/playbooks and other future services remain unfinished.
+
+## 2026-10-18 — Initial publication and tagged CI trigger check
+
+- Published main commit dec9514 and annotated v0.1.0; both remote refs verified.
+- GitHub registered the workflow as active; Actions permissions are enabled/all.
+  No Actions run or Actions check suite appeared for the initial atomic push.
+  GitHub service status reported no unresolved incident; cause is unconfirmed.
+- Preserve v0.1.0. Prepare v0.1.1 metadata and push its main commit before creating
+  the new tag, so workflow registration precedes that tag event. No branch/PR
+  trigger or manual-dispatch workaround added. Remote artifacts remain unverified.

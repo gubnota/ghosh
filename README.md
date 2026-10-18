@@ -301,7 +301,7 @@ To reproduce packaging on the corresponding native architecture:
 ```sh
 npm ci
 bash scripts/check.sh
-bash scripts/build-release.sh v0.1.0
+bash scripts/build-release.sh v0.1.1
 ```
 
 Output is under ignored `artifacts/`. Increment package.json (and lockfile),
