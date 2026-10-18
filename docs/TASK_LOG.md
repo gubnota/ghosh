@@ -243,3 +243,9 @@
 - Preserve v0.1.0. Prepare v0.1.1 metadata and push its main commit before creating
   the new tag, so workflow registration precedes that tag event. No branch/PR
   trigger or manual-dispatch workaround added. Remote artifacts remain unverified.
+- v0.1.1 metadata, locked Cargo metadata and final native packaging/checksum pass.
+  Published commit 6cccd52 to main, then pushed annotated v0.1.1 separately.
+  [Tagged run 39129424692](https://github.com/gubnota/ghosh/actions/runs/39129424692)
+  started successfully for that SHA. Architecture/version, dependency install and
+  browser setup pass; macOS common checks are running, Linux waits on macOS.
+  This confirms the trigger, not successful remote artifacts or Linux acceptance.
