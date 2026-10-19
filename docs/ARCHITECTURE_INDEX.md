@@ -7,13 +7,13 @@
 | crates/ghosh-core/src/ssh_keys.rs | File-key registry, metadata, precedence, preview/commit and generator/inspector ports |
 | crates/ghosh-core/src/workspace/inventory.rs, identity.rs | Revisioned node CRUD, file identities and explicit schema migration |
 | crates/ghosh-core/src/automation.rs, workspace/automation.rs | Inert source validation/catalog, revision-bound authoring |
-| src-tauri/src/services/automation.rs | Local UI authoring bridge; no generic filesystem endpoint |
-| src/features/automation | Catalogs/editors, simple checked scripts + Ansible examples, Run dialog and JSON report export |
+| src-tauri/src/services/automation.rs, source_lint.rs | Local authoring bridge and bounded non-executing shell/Python/YAML diagnostics |
+| src/features/automation | Catalogs, offline Monaco editor/runtime, checked multi-step + Ansible examples, Run dialog, live progress/footer and JSON export |
 | src/features/comfy/ComfyDialog.tsx, playbook.ts | Keyboard recipe form and standard Ansible generator, no parallel execution engine |
 | src-tauri/src/services/ansible.rs, ansible_bridge.py | Native reviewed identities, private upstream Runner invocation, filtered NDJSON events |
 | crates/ghosh-core/src/runs.rs | Sequential check/apply/verify engine, handler/retry rules, bounded result DTOs |
 | crates/ghosh-ssh/src/exec.rs | Non-PTY SSH execution, dual-stream drain, cancellation/timeout |
-| src-tauri/src/services/runs.rs, local_exec.rs | Revision-bound worker, local process groups, private durable reports and stop |
+| src-tauri/src/services/runs.rs, local_exec.rs | Revision-bound worker, streaming output/progress, local process groups, private durable reports and stop |
 | crates/ghosh-core/tests/automation.rs | Persistence/inertness/conflict/path/schema tests |
 | crates/ghosh-core/src/terminal.rs | Bounded session/packet/size IPC DTOs and injected Pty port |
 | crates/ghosh-core/src/ssh.rs | Public review/result DTOs and per-call zeroizing credential request |

@@ -78,11 +78,13 @@ Future services remain explicitly listed below.
 
 ## Automation authoring boundary
 - Core automation owns bounded YAML/script validation; workspace/automation owns safe source paths and exact revision/digest writes.
-- Native automation exposes four typed local-shell operations; frontend owns draft/example presentation.
+- Native automation owns revision-bound authoring; source_lint runs bounded local syntax-only checks.
+- Frontend SourceEditor/editorRuntime own offline Monaco workers, completions, markers and maximize; no code execution.
 - Catalog/validation/open remain inert. Core runs owns portable task state transitions; it never resolves keys.
 - Native runs owns worker/target validation, revision checks, private reports and cancellation.
 - Local adapter owns process groups/pipes; SSH adapter owns non-PTY channels and uncertain disconnect outcomes.
-- Frontend owns target/input/credential presentation and phase report polling; no direct process or key access.
+- Frontend owns target/input/credential presentation, 600 ms report polling and background-run navigation; no direct process or key access.
+- Native registry owns live progress/32 KiB masked preview; core hooks count tasks once, transport streams both pipes.
 - Native ansible.rs owns reviewed identities and process/report integration; ansible_bridge.py delegates all Ansible semantics to pinned upstream Runner.
 - Simple schema: 1 check/apply/verify stays in core runs; standard Ansible is never translated into that format.
 - ComfyUI frontend owns reviewable standard YAML generation; shared Run services execute it.

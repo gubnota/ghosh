@@ -93,6 +93,9 @@ def main():
     def event(data):
         nonlocal observed
         kind = data.get("event", "")
+        if kind == "runner_on_start":
+            emit({"active_task": str(data.get("event_data", {}).get("task", "Ansible task"))[:200]})
+            return False
         if kind not in ("runner_on_ok", "runner_on_failed", "runner_on_unreachable", "runner_on_skipped"):
             return False
         observed += 1

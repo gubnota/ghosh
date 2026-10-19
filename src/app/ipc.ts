@@ -5,12 +5,13 @@ import type { NodeConnectionRequest, NodeConnectionPreview, NodeConnectionCommit
 import type { TerminalSession, TerminalPacket, TerminalSize } from "../generated/contracts";
 import type { KeyGenerateRequest, KeyRelinkRequest, WorkspaceKeyRequest, WorkspaceKeyPreview, WorkspaceKeyCommit, NodeIdentityRequest, IdentityPreview, KeysSnapshot, KeyImportRequest, KeyImportPreview, KeyCommitRequest, KeyRegistryRequest } from "../generated/contracts";
 import type { Node, NodeMutationRequest, NodeCommitRequest, NodeChangePreview, AppError, ApprovalDecisionRequest, OperationsSnapshot, CreateRequest, RecentWorkspace, RenameRequest, RevisionRequest, TrustRequest, WorkspaceEvent, WorkspaceSnapshot } from "../generated/contracts";
-import type { AutomationSummary, AutomationDocument, AutomationReadRequest, AutomationMutation, AutomationPreview, AutomationCommit } from "../generated/contracts";
+import type { SourceDiagnostics, AutomationSummary, AutomationDocument, AutomationReadRequest, AutomationMutation, AutomationPreview, AutomationCommit } from "../generated/contracts";
 export const desktop = isTauri();
 export const api = {
   runStart: (request: RunRequest) => invoke<RunReport>("run_start", { request }),
   runs: (request: RevisionRequest) => invoke<RunReport[]>("runs_list", { request }),
   runStop: (id: string) => invoke<void>("run_stop", { id }),
+  automationLint: (document: AutomationDocument) => invoke<SourceDiagnostics>("automation_lint", { document }),
   automations: (request: RevisionRequest) => invoke<AutomationSummary[]>("automations_list", { request }),
   automationRead: (request: AutomationReadRequest) => invoke<AutomationDocument>("automation_read", { request }),
   automationPreview: (request: AutomationMutation) => invoke<AutomationPreview>("automation_preview", { request }),

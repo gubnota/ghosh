@@ -165,7 +165,10 @@ impl Workspace {
         let files = self.automation_files(principal, &mutation.context)?;
         let document = &mutation.document;
         if !entity_id(&document.id) {
-            return Err(invalid());
+            return Err(AppError {
+                code: ErrorCode::InvalidDocument,
+                message: AUTOMATION_ID_HELP.into(),
+            });
         }
         let existing = files
             .iter()

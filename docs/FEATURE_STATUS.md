@@ -10,8 +10,8 @@ The approved operational plan remains in progress. Work is sequential.
 | SSH nodes and keys | Node CRUD, system/custom file keys, defaults, agent, encrypted key/passphrase, password implementation | Live password acceptance, agent identity picker, jumps, SSH-config import, SFTP |
 | SSH connection | Test/Terminal connect immediately; only required credentials prompt; changed known keys rejected | Persistent enrollment of newly observed host keys, route-loss recovery |
 | Terminal emulator | Real local and managed SSH PTYs, xterm, resize/split/search, bounded replay, cleanup | Richer session restoration/reconnect UI |
-| Playbooks | Simple checked scripts and standard Ansible; authoring/examples, targets, Check/Apply, Run/Stop, persistent reports and JSON export | Remote agent/MCP execution integration, richer typed adapters |
-| Scripts | Shell/Python/Deno editor/examples and local/SSH execution with exit status, runtime checks, JSON inputs and report export | Result bindings, artifacts, secret inputs and configurable Deno permissions |
+| Playbooks | Checked multi-step scripts and standard Ansible; offline maximizable editor, live logs/progress, navigation during runs, Check/Apply/Stop and report export | Remote agent/MCP execution integration, richer typed adapters |
+| Scripts | Offline Monaco syntax/completion/diagnostics, explicit ID errors, Shell/Python/Deno examples and local/SSH execution with exit status, runtime checks, JSON inputs and report export | Result bindings, artifacts, secret inputs and configurable Deno permissions |
 | Existing server-first-run | Real pinned upstream Runner; linked inventory/group_vars/roles/includes/handlers verified in a fixture | Import/preview all real entrypoints; full cross-host batch semantics; production certificate workflow acceptance |
 | Certificates | Target workflow documented | Normal Certbot/Cloudflare renewal, selective certificate distribution, Nginx restart/verification |
 | Timers | Approved design | Durable enabled schedules, recent-workspace catch-up and run reconciliation |

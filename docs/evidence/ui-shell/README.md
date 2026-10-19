@@ -79,3 +79,21 @@ These are explicit IPC-fixture presentation captures, **not native execution or 
 
 Separate genuine Ansible controller and authorized Debian/node3 tests are recorded
 in TASK_LOG.md. No GPU installation or model download was performed.
+
+- [35](35-code-editor-fixture.png): bundled Monaco syntax-highlighted source at 460×760; offline completion, maximize/restore and RU physical Cmd+S are covered by the UI journey.
+- [36](36-live-run-fixture.png): current task/output and overall 4/6 progress at 460×760; footer returns from another section. Explicit IPC fixture, not native execution evidence.
+
+## 2026-10-19 — Native 0.1.5 editor and streaming acceptance
+
+Actual macOS arm64 release app, disposable `/private/tmp/Ghosh live editor smoke 20261019.ghosh`:
+- [37](37-native-expanded-editor.png): expanded offline Monaco with shell syntax highlighting and native syntax-only validation.
+- [38](38-native-live-output.png): real local stdout/stderr visible before exit, after navigating to Nodes and returning through the running footer.
+- [39](39-native-typescript-diagnostics.png): bundled worker reports a genuine TypeScript type mismatch; Deno property completion was also observed.
+
+Run `0495d9e7-2408-4ed6-b945-3e7cdc48667f` finished with exit 0, 1/1 steps,
+100% progress and saved LIVE_STDOUT/LIVE_STDERR/FINISHED output. Cmd+S saved
+the shell script. The unsaved diagnostic draft was discarded. Original
+`/Users/vm/Documents/1.ghosh` was reopened without changing its files.
+
+Real native local tests separately verify stdout/stderr arrival before process exit,
+check/apply/verify counting, persistent final reports and old report compatibility.

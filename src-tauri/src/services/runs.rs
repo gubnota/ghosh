@@ -14,6 +14,7 @@ use std::{
 #[derive(Default)]
 pub(super) struct RunRegistry {
     pub active: Option<String>,
+    pub progress: Option<RunProgress>,
 }
 fn now() -> u64 {
     SystemTime::now()
@@ -108,6 +109,12 @@ fn load(service: &Services, id: &str) -> Result<RunReport> {
     if report.id != id {
         return Err(invalid());
     }
+    if report.state == RunState::Running {
+        let registry = service.runs.lock().map_err(poisoned)?;
+        if registry.active.as_deref() == Some(id) {
+            report.progress = registry.progress.clone();
+        }
+    }
     if report.state == RunState::Running
         && service.runs.lock().map_err(poisoned)?.active.as_deref() != Some(id)
     {
@@ -123,8 +130,40 @@ struct VerifiedExecutor<'a> {
     source: &'a str,
     input: &'a str,
     inner: &'a mut dyn Executor,
+    node: &'a str,
 }
 impl Executor for VerifiedExecutor<'_> {
+    fn step_started(&mut self, name: &str, _handler: bool) {
+        if let Ok(mut registry) = self.service.runs.lock()
+            && let Some(progress) = &mut registry.progress
+        {
+            progress.node_id = self.node.into();
+            progress.step = name.into();
+            progress.phase.clear();
+            progress.output.clear();
+            progress.truncated = false;
+        }
+    }
+    fn step_finished(&mut self, handler: bool) {
+        if let Ok(mut registry) = self.service.runs.lock()
+            && let Some(progress) = &mut registry.progress
+        {
+            if !handler {
+                progress.completed_steps += 1;
+            }
+            progress.output.clear();
+        }
+    }
+    fn phase_started(&mut self, phase: &str) {
+        if let Ok(mut registry) = self.service.runs.lock()
+            && let Some(progress) = &mut registry.progress
+        {
+            progress.phase = phase.into();
+            progress.output.clear();
+            progress.truncated = false;
+        }
+    }
+
     fn execute(
         &mut self,
         script: &str,
@@ -134,10 +173,27 @@ impl Executor for VerifiedExecutor<'_> {
         // Re-read the revision before every remote/local effect. No active mutex
         // is held during process I/O. User edits cannot authorize stale source.
         self.service.run_document(self.request, Some(self.source))?;
-        self.inner.execute(
+        let mut captured = vec![];
+        let mut truncated = false;
+        self.inner.execute_streaming(
             &format!("export GHOSH_INPUT={}\n{}", quote(self.input), script),
             timeout_s,
             cancel,
+            &mut |bytes| {
+                let previous = (captured.len(), truncated);
+                bounded_append(&mut captured, bytes, &mut truncated);
+                // Publish the last available bytes even if the process becomes
+                // silent; after the cap, continue draining without rebuilding.
+                if previous == (captured.len(), truncated) {
+                    return;
+                }
+                if let Ok(mut registry) = self.service.runs.lock()
+                    && let Some(progress) = &mut registry.progress
+                {
+                    progress.output = live_redact(&captured, self.input);
+                    progress.truncated = truncated;
+                }
+            },
         )
     }
 }
@@ -287,11 +343,27 @@ impl Services {
                 started_at: now(),
                 finished_at: None,
                 results: vec![],
+                progress: Some(RunProgress {
+                    total_steps: if uses_ansible(&document) {
+                        None
+                    } else {
+                        Some(
+                            if document.kind == AutomationKind::Playbook {
+                                parse_playbook(&document.source)?.tasks.len()
+                            } else {
+                                1
+                            } * request.targets.len(),
+                        )
+                    },
+                    step: "Connecting targets".into(),
+                    ..RunProgress::default()
+                }),
                 message: "Targets execute sequentially. Stop cannot roll back completed changes."
                     .into(),
             };
             save(self, &report, None)?;
             registry.active = Some(report.id.clone());
+            registry.progress = report.progress.clone();
             (document, report, job)
         };
         let initial = report.clone();
@@ -319,7 +391,7 @@ impl Services {
                 }
                 for (node_id, mut executor) in prepared {
                     cancel.check()?;
-                    let mut verified = VerifiedExecutor { service: &service, request: &request.automation, source: &document.source, input: &request.input, inner: executor.as_mut() };
+                    let mut verified = VerifiedExecutor { service: &service, request: &request.automation, source: &document.source, input: &request.input, node: &node_id, inner: executor.as_mut() };
                     let mut emit = |value| append(&service, &mut report, value, &request.input);
                     let result = if document.kind == AutomationKind::Playbook {
                         run_playbook(&mut verified, &parse_playbook(&document.source)?, &node_id, request.mode, cancel, &mut emit)
@@ -338,6 +410,8 @@ impl Services {
                 else if outcome.as_ref().err().is_some_and(|e| e.code == ErrorCode::Cancelled) { RunState::Stopped }
                 else if outcome.is_err() || report.results.iter().any(|r| r.state == TaskState::Failed) { RunState::Failed }
                 else { RunState::Succeeded };
+            if let Ok(registry) = service.runs.lock() { report.progress = registry.progress.clone(); }
+            if let Some(progress) = &mut report.progress { progress.output.clear(); }
             report.finished_at = Some(now());
             report.message = match report.state {
                 RunState::Succeeded if uses_ansible(&document) => "Ansible finished. Check reports predicted changes; validation and handlers follow the original playbook.",
@@ -349,11 +423,12 @@ impl Services {
             let stored = save(&service, &report, None);
             let finish = if let Err(error) = stored { Err(error) } else if report.state == RunState::Succeeded { Ok(()) } else { Err(AppError::new(if report.state == RunState::Stopped { ErrorCode::Cancelled } else { ErrorCode::ConnectionFailed })) };
             let _ = job.finish(&finish);
-            if let Ok(mut registry) = service.runs.lock() { registry.active = None; }
+            if let Ok(mut registry) = service.runs.lock() { registry.active = None; registry.progress = None; }
         });
         if spawned.is_err() {
             if let Ok(mut registry) = self.runs.lock() {
                 registry.active = None;
+                registry.progress = None;
             }
             let mut failed = initial.clone();
             failed.state = RunState::Failed;
@@ -373,7 +448,11 @@ pub(super) fn append(
     if report.results.len() >= 2048 {
         return Err(AppError::new(ErrorCode::Capacity));
     }
-    value.output = redact(&value.output, input);
+    value.output = if value.truncated {
+        live_redact(value.output.as_bytes(), input)
+    } else {
+        redact(&value.output, input)
+    };
     let used: usize = report.results.iter().map(|r| r.output.len()).sum();
     let available = (256 * 1024usize).saturating_sub(used).min(OUTPUT_LIMIT);
     if value.output.len() > available {
@@ -383,6 +462,12 @@ pub(super) fn append(
         }
         value.output.truncate(end);
         value.truncated = true;
+    }
+    if let Ok(registry) = service.runs.lock() {
+        report.progress = registry.progress.clone();
+    }
+    if let Some(progress) = &mut report.progress {
+        progress.output.clear();
     }
     report.results.push(value.clone());
     save(service, report, Some(&value))
@@ -468,6 +553,60 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         load(service, id).unwrap()
+    }
+    #[test]
+    fn running_snapshots_stream_both_outputs_before_exit_and_persist_step_counts() {
+        let (_tmp, service, mut request) = fixture(
+            "printf 'LIVE_STDOUT\\n'; printf 'LIVE_STDERR\\n' >&2; sleep 2; printf 'FINAL\\n'",
+            AutomationKind::Shell,
+        );
+        request.input = "{}".into();
+        let context = request.automation.context.clone();
+        let first = service.run_start(request).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let reports = service.runs_list(context.clone()).unwrap();
+            let report = &reports[0];
+            let progress = report.progress.as_ref().unwrap();
+            if progress.output.contains("LIVE_STDOUT") && progress.output.contains("LIVE_STDERR") {
+                assert_eq!(report.state, RunState::Running);
+                assert!(report.results.is_empty());
+                assert_eq!(progress.total_steps, Some(1));
+                assert_eq!(progress.completed_steps, 0);
+                break;
+            }
+            assert!(Instant::now() < deadline, "no live output: {report:?}");
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        let report = wait(&service, &first.id);
+        assert_eq!(report.state, RunState::Succeeded);
+        assert_eq!(report.progress.as_ref().unwrap().completed_steps, 1);
+        assert!(report.results[0].output.contains("FINAL"));
+        assert!(report.progress.as_ref().unwrap().output.is_empty());
+    }
+    #[test]
+    fn check_apply_verify_count_tasks_once_and_old_reports_still_load() {
+        let files = tempfile::tempdir().unwrap();
+        let path = quote(files.path().join("done").to_str().unwrap());
+        let source = format!(
+            "schema: 1\nname: Steps\ntasks:\n  - name: First\n    check:\n      command: test -f {path} || exit 10\n    shell:\n      command: touch {path}\n  - name: Second\n    check:\n      command: 'true'\n    shell:\n      command: 'true'\n"
+        );
+        let (_tmp, service, request) = fixture(&source, AutomationKind::Playbook);
+        let first = service.run_start(request).unwrap();
+        let report = wait(&service, &first.id);
+        assert_eq!(report.state, RunState::Succeeded, "{report:?}");
+        let progress = report.progress.as_ref().unwrap();
+        assert_eq!(progress.total_steps, Some(2));
+        assert_eq!(progress.completed_steps, 2);
+        assert!(report.results.len() > 2);
+        let mut old = serde_json::to_value(&report).unwrap();
+        old.as_object_mut().unwrap().remove("progress");
+        assert!(
+            serde_json::from_value::<RunReport>(old)
+                .unwrap()
+                .progress
+                .is_none()
+        );
     }
     #[test]
     fn local_run_persists_masks_inputs_and_rejects_stale_source() {

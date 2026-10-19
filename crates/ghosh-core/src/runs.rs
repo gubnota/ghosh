@@ -62,6 +62,18 @@ pub struct TaskResult {
     pub exit_code: Option<i32>,
     pub truncated: bool,
 }
+/// Primary tasks count once, regardless of phases or retries. Handlers are shown
+/// separately. None denotes a dynamic upstream Ansible task graph.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+pub struct RunProgress {
+    pub completed_steps: usize,
+    pub total_steps: Option<usize>,
+    pub node_id: String,
+    pub step: String,
+    pub phase: String,
+    pub output: String,
+    pub truncated: bool,
+}
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct RunReport {
     pub id: String,
@@ -79,6 +91,8 @@ pub struct RunReport {
     pub finished_at: Option<u64>,
     pub results: Vec<TaskResult>,
     pub message: String,
+    #[serde(default)]
+    pub progress: Option<RunProgress>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecEnd {
@@ -94,6 +108,19 @@ pub struct ExecOutput {
 }
 /// One bounded invocation. Adapters must drain both streams and observe cancellation.
 pub trait Executor {
+    fn step_started(&mut self, _name: &str, _handler: bool) {}
+    fn step_finished(&mut self, _handler: bool) {}
+    fn phase_started(&mut self, _phase: &str) {}
+    fn execute_streaming(
+        &mut self,
+        script: &str,
+        timeout_s: u32,
+        cancel: &Cancellation,
+        _output: &mut dyn FnMut(&[u8]),
+    ) -> Result<ExecOutput> {
+        self.execute(script, timeout_s, cancel)
+    }
+
     fn execute(
         &mut self,
         script: &str,
@@ -164,8 +191,10 @@ fn invoke(
     script: &str,
     timeout: u32,
     cancel: &Cancellation,
+    phase: &str,
 ) -> Result<ExecOutput> {
     cancel.check()?;
+    executor.phase_started(phase);
     executor.execute(script, timeout, cancel)
 }
 fn failed(state: TaskState) -> bool {
@@ -191,6 +220,7 @@ fn run_task(
                 &format!("test -e {}", quote(path)),
                 task.timeout_s,
                 cancel,
+                "creates",
             )?;
             match out.end {
                 ExecEnd::Exited(0) => {
@@ -209,7 +239,7 @@ fn run_task(
             }
         }
         if let Some(unless) = &task.unless {
-            let out = invoke(executor, unless, task.timeout_s, cancel)?;
+            let out = invoke(executor, unless, task.timeout_s, cancel, "unless")?;
             match out.end {
                 ExecEnd::Exited(0) => {
                     let mut value = result(node, &task.name, "unless", out, false);
@@ -226,7 +256,13 @@ fn run_task(
                 }
             }
         }
-        let out = invoke(executor, &task.check.command, task.timeout_s, cancel)?;
+        let out = invoke(
+            executor,
+            &task.check.command,
+            task.timeout_s,
+            cancel,
+            "check",
+        )?;
         let drift = out.end == ExecEnd::Exited(10);
         let mut value = result(node, &task.name, "check", out, false);
         if drift {
@@ -242,7 +278,13 @@ fn run_task(
             });
         }
         changed |= task.changed_when.as_deref() != Some("false");
-        let out = invoke(executor, &task.shell.command, task.timeout_s, cancel)?;
+        let out = invoke(
+            executor,
+            &task.shell.command,
+            task.timeout_s,
+            cancel,
+            "apply",
+        )?;
         let mut value = result(
             node,
             &task.name,
@@ -261,7 +303,13 @@ fn run_task(
             }
             return Ok(apply_state);
         }
-        let out = invoke(executor, &task.check.command, task.timeout_s, cancel)?;
+        let out = invoke(
+            executor,
+            &task.check.command,
+            task.timeout_s,
+            cancel,
+            "verify",
+        )?;
         let mut value = result(node, &task.name, "verify", out, false);
         let verify_state = value.state;
         if verify_state == TaskState::Failed && attempt < task.retries {
@@ -287,7 +335,9 @@ pub fn run_playbook(
 ) -> Result<()> {
     let mut notified = BTreeSet::new();
     for task in &book.tasks {
+        executor.step_started(&task.name, false);
         let state = run_task(executor, task, node, mode, cancel, emit)?;
+        executor.step_finished(false);
         if failed(state) {
             return Ok(());
         }
@@ -299,7 +349,10 @@ pub fn run_playbook(
     for name in notified {
         let mut handler = book.handlers[&name].clone();
         handler.name = format!("Handler: {}", handler.name);
-        if failed(run_task(executor, &handler, node, mode, cancel, emit)?) {
+        executor.step_started(&handler.name, true);
+        let state = run_task(executor, &handler, node, mode, cancel, emit)?;
+        executor.step_finished(true);
+        if failed(state) {
             break;
         }
     }
@@ -313,13 +366,54 @@ pub fn run_script(
     cancel: &Cancellation,
     emit: &mut dyn FnMut(TaskResult) -> Result<()>,
 ) -> Result<()> {
+    executor.step_started(&document.id, false);
     let out = invoke(
         executor,
         &script_payload(document.kind, &document.source, input)?,
         600,
         cancel,
+        "script",
     )?;
-    emit(result(node, &document.id, "script", out, true))
+    emit(result(node, &document.id, "script", out, true))?;
+    executor.step_finished(false);
+    Ok(())
+}
+/// Hold a possible partial input value back until more bytes arrive. Redraw a
+/// bounded prefix instead of redacting chunks independently (which leaks splits).
+pub fn live_redact(bytes: &[u8], input: &str) -> String {
+    fn strings(value: &serde_json::Value, out: &mut Vec<String>) {
+        match value {
+            serde_json::Value::String(s) if !s.is_empty() => out.push(s.clone()),
+            serde_json::Value::Array(a) => a.iter().for_each(|v| strings(v, out)),
+            serde_json::Value::Object(o) => o.values().for_each(|v| strings(v, out)),
+            _ => (),
+        }
+    }
+    let mut values = vec![];
+    if let Ok(value) = serde_json::from_str(input) {
+        strings(&value, &mut values);
+    }
+    let text = String::from_utf8_lossy(bytes);
+    let mut end = text
+        .len()
+        .saturating_sub(values.iter().map(String::len).max().unwrap_or(0));
+    loop {
+        let previous = end;
+        for value in &values {
+            for (start, _) in text.match_indices(value) {
+                if start < end && start + value.len() > end {
+                    end = start;
+                }
+            }
+        }
+        if previous == end {
+            break;
+        }
+    }
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    redact(&text[..end], input)
 }
 /// Literal JSON string inputs are masked. Arbitrary program output is sensitive;
 /// this is not a general secret detector and never permits passing SSH credentials.
@@ -351,6 +445,25 @@ pub fn redact(output: &str, input: &str) -> String {
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+    #[test]
+    fn streamed_masking_holds_split_values_and_handles_unicode_overlaps() {
+        let input = r#"{"a":"secret-value","b":"value","c":"世界"}"#;
+        let text = "visible log\nsecret-value 世界 trailing log text with padding";
+        for end in 0..=text.len() {
+            let preview = live_redact(&text.as_bytes()[..end], input);
+            assert!(!preview.contains("secret"), "{end}: {preview}");
+            assert!(!preview.contains("世界"));
+        }
+        assert!(live_redact(text.as_bytes(), input).contains("[input]"));
+        assert_eq!(live_redact("世界\n".as_bytes(), "{}"), "世界\n");
+        assert_eq!(
+            live_redact(
+                b"before abcdefgh suffixxxxxxxxx",
+                r#"{"x":"cdefgh","y":"abcdefgh"}"#
+            ),
+            "before [input] suffix"
+        );
+    }
     struct Fake {
         ends: VecDeque<ExecEnd>,
         commands: Vec<String>,

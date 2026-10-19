@@ -9,6 +9,15 @@ impl Executor for Connection {
         timeout_s: u32,
         cancel: &Cancellation,
     ) -> Result<ExecOutput> {
+        self.execute_streaming(script, timeout_s, cancel, &mut |_| {})
+    }
+    fn execute_streaming(
+        &mut self,
+        script: &str,
+        timeout_s: u32,
+        cancel: &Cancellation,
+        on_output: &mut dyn FnMut(&[u8]),
+    ) -> Result<ExecOutput> {
         cancel.check()?;
         if !self.reviewed
             || !self.session.authenticated()
@@ -55,6 +64,9 @@ impl Executor for Connection {
                 match channel.stream(stream).read(&mut bytes) {
                     Ok(length) => {
                         read_any |= length > 0;
+                        if length > 0 {
+                            on_output(&bytes[..length]);
+                        }
                         bounded_append(&mut output, &bytes[..length], &mut truncated);
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => (),

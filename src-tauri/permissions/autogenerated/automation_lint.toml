@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-automation-lint"
+description = "Enables the automation_lint command without any pre-configured scope."
+commands.allow = ["automation_lint"]
+
+[[permission]]
+identifier = "deny-automation-lint"
+description = "Denies the automation_lint command without any pre-configured scope."
+commands.deny = ["automation_lint"]

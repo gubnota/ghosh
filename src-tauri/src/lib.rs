@@ -24,6 +24,7 @@ pub fn run() {
             commands::runs_list,
             commands::run_stop,
             commands::automations_list,
+            commands::automation_lint,
             commands::automation_read,
             commands::automation_preview,
             commands::automation_commit,

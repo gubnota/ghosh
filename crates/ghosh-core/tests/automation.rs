@@ -46,6 +46,32 @@ fn reviewed(ws: &Workspace, mutation: AutomationMutation) -> AutomationCommit {
     }
 }
 #[test]
+fn script_id_error_is_specific_and_correction_preserves_source() {
+    let (_tmp, mut ws) = fixture();
+    let mut change = mutation(&ws);
+    change.document = AutomationDocument {
+        id: "create a file".into(),
+        kind: AutomationKind::Shell,
+        source: "#!/bin/sh\ncd ~\necho '123' > out.txt\n".into(),
+    };
+    assert_eq!(validate(&change.document).issues, [AUTOMATION_ID_HELP]);
+    let error = ws
+        .automation_preview(Principal::LocalUi, &change)
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidDocument);
+    assert_eq!(error.message, AUTOMATION_ID_HELP);
+    assert_eq!(fs::read_dir(ws.root().join("scripts")).unwrap().count(), 0);
+    change.document.id = "create-a-file".into();
+    let exact = change.document.source.clone();
+    let request = reviewed(&ws, change);
+    ws.automation_commit(Principal::LocalUi, &request, &Cancellation::default())
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(ws.root().join("scripts/create-a-file.sh")).unwrap(),
+        exact
+    );
+}
+#[test]
 fn source_roundtrip_revision_binding_and_recoverable_removal() {
     let (tmp, mut ws) = fixture();
     let request = reviewed(&ws, mutation(&ws));

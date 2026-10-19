@@ -70,6 +70,14 @@ pub async fn run_stop(
     run(move || service.run_stop(id)).await
 }
 #[tauri::command]
+pub async fn automation_lint(
+    window: WebviewWindow,
+    document: AutomationDocument,
+) -> Result<SourceDiagnostics> {
+    caller(&window)?;
+    run(move || crate::services::lint_source(document)).await
+}
+#[tauri::command]
 pub async fn automations_list(
     window: WebviewWindow,
     state: State<'_, Arc<Services>>,

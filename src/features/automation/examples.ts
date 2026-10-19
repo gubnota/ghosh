@@ -12,6 +12,33 @@ tasks:
       command: mkdir -p /tmp/ghosh-checked-example
     timeout_s: 30
 ` } },
+  { label: "Multi-step · file and success checks", description: "Three checked steps with live logs: directory, file content and permissions. Apply locally or on selected SSH nodes; repeated runs skip completed work.", document: {
+    id: "multi-step-file", kind: "playbook", source: `schema: 1
+name: Multi-step file example
+tasks:
+  - name: Prepare directory
+    check:
+      command: test -d /tmp/ghosh-steps-example || exit 10
+    shell:
+      command: printf 'Creating directory\\n'; mkdir -p /tmp/ghosh-steps-example
+    timeout_s: 30
+  - name: Write and verify file
+    check:
+      command: test "$(cat /tmp/ghosh-steps-example/out.txt 2>/dev/null)" = 123 || exit 10
+    shell:
+      command: |
+        printf 'Writing file\\n'
+        printf '123\\n' > /tmp/ghosh-steps-example/out.txt
+        sleep 1
+        printf 'File written\\n'
+    timeout_s: 30
+  - name: Restrict file permissions
+    check:
+      command: test "$(ls -l /tmp/ghosh-steps-example/out.txt | cut -c1-10)" = "-rw-------" || exit 10
+    shell:
+      command: chmod 600 /tmp/ghosh-steps-example/out.txt
+    timeout_s: 30
+` } },
   { label: "Inspect Linux node", description: "Read OS, uptime and disk information. The check prints facts and makes no changes.", document: {
     id: "linux-facts", kind: "playbook", source: `- name: Inspect Linux node
   hosts: all

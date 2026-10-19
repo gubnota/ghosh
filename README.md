@@ -21,9 +21,15 @@ The feature checklist separates delivered behavior from remaining work. See the 
 
 ## Screenshots
 
-Captures 01–31 below are actual native app captures, not Base44 mockups. Screenshots show public
+Captures 01–31 and 37–39 are actual native app captures, not Base44 mockups. Screenshots show public
 metadata for a disposable identity or an explicitly selected existing key; no private
 key material is shown.
+
+![Expanded offline code editor in Ghosh 0.1.5](docs/evidence/ui-shell/37-native-expanded-editor.png)
+
+![Native live stdout and stderr while a local script is still running](docs/evidence/ui-shell/38-native-live-output.png)
+
+![Bundled TypeScript worker reports a type error in the native app](docs/evidence/ui-shell/39-native-typescript-diagnostics.png)
 
 ![Run a scenario sequentially on selected SSH nodes and the local machine](docs/evidence/ui-shell/29-run-targets.png)
 
@@ -60,6 +66,10 @@ key material is shown.
 New authoring screens below are **browser presentation captures with explicit IPC
 fixtures**, not evidence of a GPU installation or native Ansible execution. Actual
 Ansible and SSH acceptance is recorded under Checks.
+
+![Offline syntax-highlighted editor in a compact window, browser fixture](docs/evidence/ui-shell/35-code-editor-fixture.png)
+
+![Live multi-step progress and command output, browser fixture](docs/evidence/ui-shell/36-live-run-fixture.png)
 
 ![ComfyUI recipe wizard: existing paths, model family and pinned plugin/model inputs](docs/evidence/ui-shell/34-comfy-wizard-fixture.png)
 
@@ -220,13 +230,58 @@ verify success. This example is idempotent. Use a read-only check that actually
 verifies the result you need. Explicit retries, `creates`/`unless`, `changed_when`
 and named deduplicated handlers are also supported.
 
+For multiple steps, choose **Multi-step · file and success checks** in the example
+selector. It creates a directory, writes `123` to `out.txt`, then sets permissions;
+each step checks its own result. **Apply** skips already satisfied steps. Commands
+in a step run in a new shell, so repeat `cd` or use explicit paths between steps.
+`printf`/stdout and stderr appear live in **Runs**. A failed check, command or verify
+stops that target; there is no rollback. The other selected targets still execute.
+
+A minimal two-step version of “create a file” is:
+
+```yaml
+schema: 1
+name: Create a file and protect it
+tasks:
+  - name: Write file
+    check:
+      command: test "$(cat "$HOME/out.txt" 2>/dev/null)" = 123 || exit 10
+    shell:
+      command: |
+        set -eu
+        printf 'Writing out.txt\n'
+        printf '123\n' > "$HOME/out.txt"
+    timeout_s: 30
+  - name: Set permissions
+    check:
+      command: test "$(ls -l "$HOME/out.txt" | cut -c1-10)" = "-rw-------" || exit 10
+    shell:
+      command: chmod 600 "$HOME/out.txt"
+    timeout_s: 30
+```
+
 For larger workflows, use **standard Ansible YAML** or **Existing Ansible project**.
 Ansible owns its modules, roles, handlers, includes, templates and Check semantics;
 Ghosh does not translate it into the simple format. Inert validation checks the YAML
 play-list shape; upstream Ansible performs full execution validation.
 
-**Scripts** / `script new` offers Shell, Python and Deno examples. Validation checks
-source bounds, not interpreter syntax. The installed runtime executes on each target;
+**Scripts** / `script new` offers Shell, Python and Deno examples. IDs use 1–64
+lowercase letters, digits, hyphens or underscores, starting with a letter/digit:
+use `create-a-file` as the ID; the source remains unchanged. A space-containing ID
+shows an inline explanation and an explicit suggested correction.
+
+The bundled Monaco editor offers syntax highlighting, completion (Ctrl+Space),
+line numbers, find (Cmd+F) and **Maximize editor**. It works offline with local
+workers and fonts. Escape first dismisses suggestions, then restores the editor;
+Cmd+S saves validated source in either RU or EN layout. Ctrl+M switches Tab between
+indentation and keyboard focus navigation. **Plain text** provides a textarea fallback.
+Unsaved source remains protected when closing the dialog.
+
+Editor diagnostics use local `/bin/sh -n` for shell and Python `ast.parse` without
+executing source. YAML checks the supported document structure; TypeScript uses
+Monaco's bundled language service with basic Deno declarations. These are editor
+checks, not full remote linting or runtime compatibility guarantees. Missing local
+interpreters are reported. **Validate/Save** applies native structural/source limits. The installed runtime executes on each target;
 exit 0 means success and a nonzero exit means failure. Use `set -eu` in shell scripts
 or raise an exception/exit nonzero in Python/JavaScript when a result is invalid.
 Optional non-secret JSON inputs arrive as `GHOSH_INPUT`. Use the checked-scenario
@@ -290,10 +345,19 @@ server-first-run certificate renewal/distribution and timer acceptance remain pe
 4. Optional non-secret JSON object inputs become Ansible extra variables or the
    `GHOSH_INPUT` environment variable. Connection/inventory override variables are
    rejected. Result bindings, arbitrary artifacts and secret-input broker remain pending.
-5. **Runs** shows persistent task/phase results, exit status, bounded output and
-   **Stop run**. **Export results · JSON** saves the stored report. Targets execute
+5. **Runs** shows the current node/step/phase, overall progress, followable live
+   output, persistent task/phase results, exit status and **Stop run**. Simple
+   scenarios count tasks × targets; check/apply/verify and retries do not count as
+   extra steps. Ansible shows completed task events with indeterminate progress,
+   because dynamic includes/handlers prevent a reliable fixed total. A single script
+   is one step per target; Ghosh cannot estimate progress inside that command. **Export results · JSON** saves the stored report. Targets execute
    sequentially and only one automation run is active. Cmd+K `run plan` / `run apply`
    opens the first runnable playbook's target form.
+
+Navigate to Nodes, Terminal or another section while a run continues. The footer
+shows the active run; click it to return to logs. **Keep Ghosh open**: there is no
+background daemon or continuation after quitting. Editing/switching/closing the
+workspace remains blocked during a run; reading other sections and terminals works.
 
 SSH starts without confirmation dialogs; only a required password/key passphrase
 prompts, and neither is saved. Fresh native handshakes pin each Ansible SSH server;
@@ -304,8 +368,12 @@ group; remote stop, timeout or disconnect may leave **Outcome unknown**. Complet
 changes remain applied. Interrupted or crashed runs are never replayed automatically.
 
 Reports are private application-local files under `runs/`, scoped to workspace ID.
-The UI lists the latest 100; retention cleanup is pending. Output updates at task/phase
-completion, not every byte. Capture is 32 KiB per phase and 256 KiB per report;
+The UI lists the latest 100; retention cleanup is pending. Local/SSH commands publish both output streams during execution; the UI refreshes
+about every 600 ms. Programs may buffer their own output (Python runs unbuffered).
+Ansible publishes filtered task events instead of raw process stdout. Live previews
+are memory-only; completed phases and final reports are saved. Live masking may
+hold back a partial line until enough bytes arrive. Capture is 32 KiB per phase
+and 256 KiB per report;
 both streams continue to drain. Ansible `no_log` output is censored and only selected
 result fields are retained. Temporary Runner files are removed on return. Literal
 string inputs are masked, but arbitrary printed secrets cannot be reliably detected.
@@ -489,10 +557,17 @@ no_log censoring, failure, cancellation and private Runner cleanup:
 GHOSH_CONTROLLER_PYTHON="$HOME/.local/share/ghosh/controller/bin/python" cargo test -p ghosh-desktop upstream_ansible_check_apply_include_no_log_failure_and_stop -- --ignored --test-threads=1
 ```
 
-Latest local verification: **81 Rust tests and 28 UI journeys pass**, plus both
-opt-in controller/authorized-node tests above. Generated ComfyUI YAML passes upstream
-Ansible syntax checking; this is not GPU acceptance. Browser evidence 32–34 uses
-fixtures and does not substitute for these native integration checks.
+Latest local verification: **88 Rust tests and 32 UI journeys pass**, plus the
+genuine local opt-in controller test. Native tests verify both output streams
+arrive before process exit, step counting and loading older reports. The v0.1.5
+remote retest was blocked before execution by the approval service usage limit;
+both authorized hosts passed the preceding v0.1.4 acceptance. Generated ComfyUI
+YAML passed upstream Ansible syntax checking; this is not GPU acceptance.
+Browser evidence 32–36 uses fixtures and does not substitute for native checks.
+Native 0.1.5 acceptance also verified expanded editing, shell syntax checks,
+Cmd+S saving, Deno completion and TypeScript type diagnostics. A real local
+script streamed both outputs, continued during navigation to Nodes and finished
+with exit 0 and 100% progress; its saved report retained the final output.
 
 The optional native Keychain test creates, reads and deletes a temporary item:
 
@@ -526,7 +601,7 @@ To reproduce packaging on the corresponding native architecture:
 ```sh
 npm ci
 bash scripts/check.sh
-bash scripts/build-release.sh v0.1.4
+bash scripts/build-release.sh v0.1.5
 ```
 
 Output is under ignored `artifacts/`. Increment package.json (and lockfile),

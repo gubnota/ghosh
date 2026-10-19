@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use ts_rs::TS;
 
 pub const MAX_SOURCE: usize = 256 * 1024;
+pub const AUTOMATION_ID_HELP: &str = "ID must use 1–64 lowercase letters, digits, hyphens or underscores, starting with a letter or digit. No spaces.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -201,15 +202,18 @@ pub fn validate(document: &AutomationDocument) -> AutomationValidation {
         task_count: 0,
         issues: vec![],
     };
-    if !super::workspace::model::entity_id(&document.id)
-        || document.source.len() > MAX_SOURCE
+    if !super::workspace::model::entity_id(&document.id) {
+        result.issues.push(AUTOMATION_ID_HELP.into());
+    }
+    if document.source.len() > MAX_SOURCE
         || document.source.contains('\0')
         || document.source.trim().is_empty()
     {
-        result
-            .issues
-            .push("Use a safe ID and a nonempty UTF-8 document of at most 256 KiB.".into());
-    } else {
+        result.issues.push(
+            "Use a nonempty UTF-8 document of at most 256 KiB without NUL characters.".into(),
+        );
+    }
+    if result.issues.is_empty() {
         match document.kind {
             AutomationKind::Playbook if standard_playbook(&document.source).is_some() => {
                 let (name, count) = standard_playbook(&document.source).unwrap();
@@ -228,4 +232,16 @@ pub fn validate(document: &AutomationDocument) -> AutomationValidation {
     }
     result.valid = result.issues.is_empty();
     result
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct SourceDiagnostic {
+    pub line: usize,
+    pub column: usize,
+    pub message: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct SourceDiagnostics {
+    pub engine: String,
+    pub diagnostics: Vec<SourceDiagnostic>,
 }

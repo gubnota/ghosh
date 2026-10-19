@@ -14,13 +14,15 @@ export function RunDialog({ workspace, item, initialMode, dismiss, started, busy
   const [targets, setTargets] = useState<string[]>([workspace.nodes[0]?.id || "@local"]);
   const [mode, setMode] = useState<RunMode>(playbook ? initialMode : "apply");
   const [input, setInput] = useState("{}"), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [failedTarget, setFailedTarget] = useState("");
   const [prompts, setPrompts] = useState<NodeConnectionPreview[]>([]), [credentials, setCredentials] = useState<Record<string, string>>({});
   const inFlight = useRef(false);
   const stale = workspace.revision !== revision || workspace.external_changed || !workspace.trusted || workspace.read_only;
   useEffect(() => { busyChanged(busy); return () => busyChanged(false); }, [busy, busyChanged]);
   const submit = async () => {
     if (inFlight.current || stale || !targets.length) return;
-    inFlight.current = true; setBusy(true); setError("");
+    inFlight.current = true; setBusy(true); setError(""); setFailedTarget("");
+    let connecting = "";
     const context = { workspace_id: workspace.id, revision };
     try {
       const parsed: unknown = JSON.parse(input);
@@ -30,14 +32,16 @@ export function RunDialog({ workspace, item, initialMode, dismiss, started, busy
       const connections: RunTarget[] = [], required: NodeConnectionPreview[] = [];
       for (const node_id of targets) {
         if (node_id === "@local") { connections.push({ node_id, connection: null }); continue; }
+        connecting = node_id;
         const prepared = await api.connectionPreview({ context, node_id });
         if (prepared.credential_prompt && !credentials[node_id]) required.push(prepared);
         connections.push({ node_id, connection: { ticket: prepared.ticket, allow_unknown: true, credential: credentials[node_id] || null } });
       }
       if (required.length) { setPrompts(required); return; }
+      connecting = "";
       await api.runStart({ automation: { context, id: item.id, kind: item.kind }, targets: connections, mode, input, controller_python: python || null });
       setCredentials({}); started();
-    } catch (e) { setCredentials({}); setPrompts([]); setError(errorMessage(e)); }
+    } catch (e) { setCredentials({}); setPrompts([]); setFailedTarget(connecting); setError(errorMessage(e)); }
     finally { inFlight.current = false; setBusy(false); }
   };
   return <Dialog title="run-title" busy={busy} dismiss={dismiss}><form onSubmit={e => { e.preventDefault(); void submit(); }}>
@@ -51,7 +55,7 @@ export function RunDialog({ workspace, item, initialMode, dismiss, started, busy
     <p className="field-help">Non-secret inputs become Ansible extra variables, or GHOSH_INPUT for scripts. Output is stored locally in Runs; scripts must not print secrets. Ansible Check uses --check; tasks and plugins may still execute according to your playbook. Stop does not undo completed changes.</p>
     {prompts.map(prompt => <div key={prompt.node_id}><label htmlFor={`run-credential-${prompt.node_id}`}>{prompt.node_id} · {prompt.credential_prompt}</label><input id={`run-credential-${prompt.node_id}`} type="password" autoComplete="off" maxLength={4096} disabled={busy} value={credentials[prompt.node_id] || ""} onChange={e => setCredentials(current => ({ ...current, [prompt.node_id]: e.target.value }))} /></div>)}
     {!!prompts.length && <p className="field-help">SSH credentials are used only for this run and are never saved.</p>}
-    {stale && <p className="form-error" role="alert">Reload or resume the workspace before running.</p>}{error && <p className="form-error" role="alert">{error}</p>}
+    {stale && <p className="form-error" role="alert">Reload or resume the workspace before running.</p>}{error && <p className="form-error" role="alert">{failedTarget && <strong>{failedTarget}: </strong>}{error}</p>}
     <div className="modal-actions"><button type="button" disabled={busy} onClick={dismiss}>Cancel</button><button className="primary" disabled={busy || stale || !targets.length || targets.length > 8}>{busy ? "Connecting…" : prompts.length ? "Connect and start" : mode === "check" ? "Start check" : "Start run"}</button></div>
   </form></Dialog>;
 }

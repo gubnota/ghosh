@@ -25,6 +25,27 @@ fn endpoint(node: &Node) -> Endpoint {
         user: node.user.clone(),
     }
 }
+fn require_file_identity(identity: &IdentityPreview) -> Result<()> {
+    let message = match (identity.key_id.as_ref(), identity.status) {
+        (Some(_), Some(KeyStatus::Available)) => return Ok(()),
+        (None, _) => {
+            "No SSH file key is assigned. In SSH Keys, choose a workspace or global default, or edit this node and select a File key."
+        }
+        (_, Some(KeyStatus::Changed)) => {
+            "The selected SSH key file changed since registration. In SSH Keys, relink the same identity to verify it again, or explicitly select another key in Nodes."
+        }
+        (_, Some(KeyStatus::Unsafe)) => {
+            "The selected SSH key path is unsafe. Choose a regular file owned by you with permissions 0600 or 0400, without symlinks or hard links, then relink it in SSH Keys."
+        }
+        _ => {
+            "The selected SSH key reference or file is missing. Relink it in SSH Keys or edit this node to select an available File key. An explicit missing assignment does not fall back to another identity."
+        }
+    };
+    Err(AppError {
+        code: ErrorCode::KeyUnavailable,
+        message: message.into(),
+    })
+}
 fn prepare(
     active: &Active,
     request: &NodeConnectionRequest,
@@ -52,9 +73,8 @@ fn prepare(
         .workspace
         .workspace_key(Principal::LocalUi, &request.context)?;
     let identity = select_identity(&node, default.as_deref(), keys);
-    if matches!(node.auth.method, AuthMethod::Key) && identity.status != Some(KeyStatus::Available)
-    {
-        return Err(AppError::new(ErrorCode::KeyUnavailable));
+    if matches!(node.auth.method, AuthMethod::Key) {
+        require_file_identity(&identity)?;
     }
     Ok((node, identity))
 }
@@ -160,10 +180,8 @@ impl Services {
                     .as_ref()
                     .map(PathBuf::from)
                     .or_else(|| std::env::var_os("SSH_AUTH_SOCK").map(PathBuf::from))
-                    .ok_or_else(|| AppError::new(ErrorCode::KeyUnavailable))?;
-                if !socket.is_absolute() {
-                    return Err(AppError::new(ErrorCode::InvalidPath));
-                }
+                    .filter(|socket| socket.is_absolute())
+                    .ok_or_else(|| AppError::new(ErrorCode::AgentUnavailable))?;
                 identity.public = Some(ghosh_ssh::agent_identity(
                     socket.clone(),
                     job.cancellation(),
@@ -384,6 +402,36 @@ fn uuid_ticket() -> String {
 mod tests {
     use super::*;
     use ghosh_core::workspace::model::Auth;
+
+    #[test]
+    fn file_identity_errors_explain_assignment_and_file_recovery() {
+        let mut identity = IdentityPreview {
+            source: "global".into(),
+            key_id: None,
+            public: None,
+            status: Some(KeyStatus::Missing),
+            registry_revision: "test".into(),
+        };
+        assert!(
+            require_file_identity(&identity)
+                .unwrap_err()
+                .message
+                .contains("No SSH file key is assigned")
+        );
+        identity.key_id = Some("test".into());
+        for (status, expected) in [
+            (KeyStatus::Missing, "reference or file is missing"),
+            (KeyStatus::Changed, "changed since registration"),
+            (KeyStatus::Unsafe, "path is unsafe"),
+        ] {
+            identity.status = Some(status);
+            let error = require_file_identity(&identity).unwrap_err();
+            assert_eq!(error.code, ErrorCode::KeyUnavailable);
+            assert!(error.message.contains(expected));
+        }
+        identity.status = Some(KeyStatus::Available);
+        require_file_identity(&identity).unwrap();
+    }
 
     /// Explicit opt-in only. Uses existing verified host trust and a referenced
     /// current-user key. Creates only disposable local workspace/registry files.

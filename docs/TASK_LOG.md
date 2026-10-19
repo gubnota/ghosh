@@ -425,3 +425,42 @@
 - Release 0.1.4: native macOS arm64 bundle built; version manifests aligned and
   controller requirements included in the archive. Archive SHA-256 verification
   passed. Main/tag publication is authorized; GitHub CI status is tracked separately.
+
+## 2026-10-19 — Offline script editor and live multi-step runs
+
+- Fixed invalid script ID feedback: explicit rules and an optional corrected ID;
+  source survives correction. SSH agent, missing key, changed key and unsafe file
+  failures now give distinct recovery instructions without weakening file checks.
+- Added bundled offline Monaco, expandable editor, syntax highlighting/completion,
+  find, RU/EN physical Cmd+S, plain-text fallback and syntax-only diagnostics.
+  Shell uses sh -n, Python uses isolated ast.parse, YAML uses native validation;
+  TypeScript uses bundled workers. Diagnostics never execute the edited source.
+- Reused schema: 1 tasks/check/shell for multi-step scripts, added a three-step
+  file example, and retained standard upstream Ansible. Runs show current target,
+  step/phase, bounded live output and primary-step progress. Footer returns to logs
+  while navigating. Dynamic Ansible shows completed task counts without a guessed
+  total. App exit does not provide durable background execution.
+- Native adapters drain stdout/stderr during execution; input masking handles read
+  boundaries. Live previews stay in memory; completed phases/final reports retain
+  private atomic persistence and backward-compatible optional progress metadata.
+- Full check.sh passed: 88 Rust tests, three opt-in skipped, 32 single-worker UI
+  journeys, formatting, warning-denied Clippy, contract freshness and frontend build.
+  Genuine local Ansible opt-in passed using .cache/ansible-controller/bin/python
+  (10.35 s); the initially tried default controller path did not exist locally.
+  After final Ansible task-name masking, focused genuine controller acceptance
+  passed again (10.73 s); formatting and diff whitespace checks also passed.
+- Screenshots 35–36 in README are explicitly browser IPC fixtures; native tests
+  separately prove both streams arrive before process exit and counts persist.
+- Retesting Debian/node3 was not executed: automatic approval review hit its
+  service usage limit. This was not an unsafe-action determination. Prior v0.1.4
+  remote acceptance remains historical evidence, not a v0.1.5 retest.
+- Version manifests aligned to 0.1.5; native macOS arm64 release built (14.75 MiB app).
+  Actual native captures 37–39 document expanded editing, sh -n diagnostics,
+  physical Cmd+S saving, Deno completion and bundled TypeScript type diagnostics.
+  Local run 0495d9e7-2408-4ed6-b945-3e7cdc48667f streamed stdout/stderr before
+  exit, survived navigation to Nodes and finished exit 0, 1/1 steps, 100%.
+  Final saved output includes FINISHED. Discarded the temporary Deno draft and
+  reopened original 1.ghosh without changing its files. Archive includes current
+  README/controller requirements; archive SHA-256 and embedded README verification
+  passed. Main/tag publication is authorized; CI status is tracked separately.
+  Linux CI remains commented out; only version tags trigger the macOS workflow.

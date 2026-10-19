@@ -20,6 +20,7 @@ pub enum ErrorCode {
     Cancelled,
     SecretUnavailable,
     KeyUnavailable,
+    AgentUnavailable,
     ConnectionFailed,
     HostKeyChanged,
     AuthenticationFailed,
@@ -67,6 +68,9 @@ impl AppError {
             }
             ErrorCode::KeyUnavailable => {
                 "The SSH key is missing, changed, unsafe, or unsupported. Select a regular private key file owned by you with permissions 0600 or 0400."
+            }
+            ErrorCode::AgentUnavailable => {
+                "The SSH agent is unavailable, has no supported keys, or no longer holds the selected identity. Load your key into the agent and check its socket in Nodes, or choose File key authentication. For a legacy workspace, enable file identities in SSH Keys first."
             }
             ErrorCode::Internal => "An internal operation failed. Reopen the workspace.",
             ErrorCode::ConnectionFailed => {

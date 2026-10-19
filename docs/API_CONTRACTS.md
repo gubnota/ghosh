@@ -1,7 +1,7 @@
 # API contracts
 
 Status: workspace/node/key persistence, operations/approvals and local/SSH PTY implemented.
-Scenario execution and later services are future.
+Simple scenarios/scripts and upstream Ansible execution are implemented; later browser/monitoring services remain future.
 Normative target: [ghosh-prompt.md](ghosh-prompt.md), Appendices A/B.
 
 ## Workspace persistence
@@ -14,7 +14,7 @@ Normative target: [ghosh-prompt.md](ghosh-prompt.md), Appendices A/B.
 - Config paths reject traversal, absolute paths, overlaps and all symlinks.
 - Leases bind canonical path and workspace ID across cooperating local processes.
 - Revision is a SHA-256 configuration snapshot, not an arbitrary client-provided version.
-- It covers manifest and flat nodes/profiles/tunnels/certs/recipes TOML, not browser data/scripts.
+- It covers manifest and flat nodes/profiles/tunnels/certs/recipes TOML, not browser data. Flat automation source files also participate (see authoring).
 - Bounds: 1 MiB/document, 1,024 entity files, 16 MiB aggregate revision input.
 - Rename requires LocalUi, matching workspace ID/revision and unchanged on-disk configuration.
 - Temporary-file sync + revision recheck + atomic replacement + directory sync commit one file.
@@ -204,6 +204,8 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - automations_list(RevisionRequest) -> AutomationSummary[]; automation_read({context,id,kind}) -> document.
 - automation_preview({context,document,replace,remove}) -> {digest,validation:{valid,name,task_count,issues}}.
 - automation_commit({mutation,digest}) -> WorkspaceSnapshot; rechecks source/path/disk/revision and caller.
+- automation_lint(AutomationDocument) -> SourceDiagnostics {engine, diagnostics:[{line,column,message}]}; bounded syntax-only local checks, no source execution/network/install.
+- IDs: ^[a-z0-9][a-z0-9_-]{0,63}$; invalid ID returns a specific recovery message without changing source.
 - Local UI only; paths derive from manifest folders and safe IDs, never caller-supplied write paths.
 - Save preserves source bytes; remove uses the existing recoverable .removed convention.
 - Flat .yml/.yaml, .ansible.yml, .sh/.py/.ts/.js participate in revision hashing.
@@ -244,4 +246,9 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Reports: app-local runs/<uuid>.json atomic snapshot and metadata-only .jsonl events; 0700/0600.
 - Output: 32 KiB/phase, 256 KiB/run, max 2,048 results; both streams drain beyond cap.
 - JSON string inputs masked; output remains sensitive. Inputs, credentials and unbounded output are never stored as request metadata.
-- UI polls at 1.2s; output appears at task/phase completion, not byte streaming. Export JSON downloads the bounded stored report. No retention cleanup yet.
+- Optional RunReport.progress (serde default for old reports): {completed_steps,total_steps:null|number,node_id,step,phase,output,truncated}.
+- Simple task total = tasks × targets; a script = targets. Count main tasks once, not retries/phases/handlers. Running display caps at 99% until success.
+- Ansible total_steps=null; filtered task starts/results update active task and completed count.
+- Live registry merges into running snapshots; both local/SSH streams publish masked bounded previews before exit. Prefix withholding prevents split literal-input leaks.
+- UI polls at 600 ms and navigation does not cancel workers. Completed phases/final reports persist; live-only chunks are not a crash journal. App exit is not supported continuation.
+- Export JSON downloads the current bounded snapshot. No retention cleanup yet.

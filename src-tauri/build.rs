@@ -5,6 +5,7 @@ fn main() {
             "runs_list",
             "run_stop",
             "automations_list",
+            "automation_lint",
             "automation_read",
             "automation_preview",
             "automation_commit",

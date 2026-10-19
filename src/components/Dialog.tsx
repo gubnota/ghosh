@@ -6,8 +6,8 @@ function activeInvoker(): HTMLElement | null {
   return dialog && invokers.has(dialog) ? invokers.get(dialog)! : active;
 }
 
-export function Dialog({ title, dismiss, busy = false, alert = false, className = "", children }: {
-  title: string; dismiss: () => void; busy?: boolean; alert?: boolean; className?: string; children: ReactNode;
+export function Dialog({ title, dismiss, busy = false, alert = false, className = "", save, children }: {
+  title: string; dismiss: () => void; busy?: boolean; alert?: boolean; className?: string; children: ReactNode; save?: () => void;
 }) {
   const element = useRef<HTMLDialogElement>(null);
   // Capture before child autofocus runs during the commit.
@@ -28,7 +28,10 @@ export function Dialog({ title, dismiss, busy = false, alert = false, className 
       dialog.querySelector<HTMLElement>("[data-dialog-focus]:not(:disabled)")?.focus();
     }
   }, [busy]);
-  return <dialog ref={element} className={`modal ${className}`} role={alert ? "alertdialog" : "dialog"} aria-labelledby={title} onKeyDown={event => {
+  return <dialog ref={element} className={`modal ${className}`} role={alert ? "alertdialog" : "dialog"} aria-labelledby={title} onKeyDownCapture={event => {
+    if (save && (event.metaKey || event.ctrlKey) && event.code === "KeyS") { event.preventDefault(); event.stopPropagation(); save(); }
+  }} onKeyDown={event => {
+    if (event.defaultPrevented || (event.target instanceof Element && event.target.closest(".monaco-editor"))) return;
     if (event.key !== "Tab") return;
     const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]')].filter(control => control.tabIndex >= 0 && !control.matches(":disabled") && control.getClientRects().length);
     const first = controls[0], last = controls[controls.length - 1];

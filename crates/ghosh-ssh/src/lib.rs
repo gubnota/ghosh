@@ -50,28 +50,36 @@ fn agent_work<T: Send + 'static>(
         .is_err()
     {
         AGENT_WORKERS.fetch_sub(1, Ordering::SeqCst);
-        return Err(failed());
+        return Err(AppError::new(ErrorCode::AgentUnavailable));
     }
     let deadline = Instant::now() + TIMEOUT;
     loop {
         cancel.check()?;
         match receive.recv_timeout(Duration::from_millis(50)) {
             Ok(result) => return result,
-            Err(mpsc::RecvTimeoutError::Disconnected) => return Err(failed()),
-            Err(_) if Instant::now() >= deadline => return Err(failed()),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Err(AppError::new(ErrorCode::AgentUnavailable));
+            }
+            Err(_) if Instant::now() >= deadline => {
+                return Err(AppError::new(ErrorCode::AgentUnavailable));
+            }
             Err(_) => (),
         }
     }
 }
 fn agent(session: &Session, socket: &Path) -> Result<ssh2::Agent> {
-    let mut agent = session.agent().map_err(|_| failed())?;
-    agent.set_identity_path(socket).map_err(|_| failed())?;
+    let mut agent = session
+        .agent()
+        .map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
+    agent
+        .set_identity_path(socket)
+        .map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
     agent
         .connect()
-        .map_err(|_| AppError::new(ErrorCode::KeyUnavailable))?;
+        .map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
     agent
         .list_identities()
-        .map_err(|_| AppError::new(ErrorCode::KeyUnavailable))?;
+        .map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
     Ok(agent)
 }
 fn public_key(blob: &[u8]) -> Result<PublicKeyMetadata> {
@@ -98,12 +106,14 @@ fn public_key(blob: &[u8]) -> Result<PublicKeyMetadata> {
 /// no automatic retries with other agent identities are allowed.
 pub fn agent_identity(socket: PathBuf, cancel: &Cancellation) -> Result<PublicKeyMetadata> {
     agent_work(cancel, move || {
-        let session = Session::new().map_err(|_| failed())?;
+        let session = Session::new().map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
         let agent = agent(&session, &socket)?;
-        let keys = agent.identities().map_err(|_| failed())?;
+        let keys = agent
+            .identities()
+            .map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
         keys.iter()
             .find_map(|key| public_key(key.blob()).ok())
-            .ok_or_else(|| AppError::new(ErrorCode::KeyUnavailable))
+            .ok_or_else(|| AppError::new(ErrorCode::AgentUnavailable))
     })
 }
 
@@ -114,13 +124,15 @@ pub fn agent_public_record(
     cancel: &Cancellation,
 ) -> Result<String> {
     agent_work(cancel, move || {
-        let session = Session::new().map_err(|_| failed())?;
+        let session = Session::new().map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
         let agent = agent(&session, &socket)?;
-        let keys = agent.identities().map_err(|_| failed())?;
+        let keys = agent
+            .identities()
+            .map_err(|_| AppError::new(ErrorCode::AgentUnavailable))?;
         let key = keys
             .iter()
             .find(|key| public_key(key.blob()).is_ok_and(|p| p == reviewed))
-            .ok_or_else(|| AppError::new(ErrorCode::KeyUnavailable))?;
+            .ok_or_else(|| AppError::new(ErrorCode::AgentUnavailable))?;
         Ok(format!(
             "{} {}\n",
             reviewed.algorithm,
@@ -431,7 +443,7 @@ impl Connection {
             let key = keys
                 .iter()
                 .find(|key| public_key(key.blob()).is_ok_and(|public| public == reviewed))
-                .ok_or_else(|| AppError::new(ErrorCode::KeyUnavailable))?;
+                .ok_or_else(|| AppError::new(ErrorCode::AgentUnavailable))?;
             agent
                 .userauth(&user, key)
                 .map_err(|_| AppError::new(ErrorCode::AuthenticationFailed))?;
@@ -569,6 +581,15 @@ impl Pty for RemotePty {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn absent_agent_reports_agent_recovery_instead_of_file_permissions() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket = directory.path().join("absent-agent");
+        let error = agent_identity(socket, &Cancellation::default()).unwrap_err();
+        assert_eq!(error.code, ErrorCode::AgentUnavailable);
+        assert!(error.message.contains("SSH agent"));
+        assert!(!error.message.contains("0600"));
+    }
     #[test]
     fn changed_key_and_unapproved_unknown_are_rejected() {
         let key = vec![1, 2, 3];

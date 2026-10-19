@@ -323,3 +323,20 @@ td, th { vertical-align: middle; }
 .operation-card p, .operation-card summary { overflow-wrap: anywhere; }
 .state-outcome_unknown, .state-drift, .state-retrying { color: var(--yellow); }
 .state-changed, .state-ok { color: var(--green); }
+
+.run-live { min-width: 0; margin: 1rem 0; padding: .8rem; border: 1px solid var(--border); }
+.run-live progress { display: block; width: 100%; height: .5rem; margin: .8rem 0; accent-color: var(--cyan); }
+.live-output { max-height: 20rem; min-height: 6rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); padding: .8rem; font: inherit; }
+.background-run { display: inline-flex; align-items: center; gap: .4rem; max-width: 30%; min-width: 0; }
+.background-run span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-dot { width: .5rem; height: .5rem; background: var(--cyan); border-radius: 50%; flex: none; }
+
+.source-workbench { display:flex; flex-direction:column; min-width:0; gap:.5rem; }
+.editor-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.5rem; align-items:center; }
+.monaco-host { height: min(45vh, 420px); min-height:220px; width:100%; border:1px solid var(--border); overflow:hidden; }
+.editor-diagnostics { font-size:.75rem; line-height:1.6; color:var(--muted); overflow-wrap:anywhere; max-height:5rem; overflow:auto; }
+.automation-dialog.editor-expanded { width:calc(100vw - 2rem); max-width:none; height:calc(100dvh - 2rem); max-height:none; display:flex; flex-direction:column; }
+.editor-expanded .source-workbench { flex:1; min-height:250px; }
+.editor-expanded .monaco-host, .editor-expanded .source-editor { flex:1; min-height:180px; max-height:none; height:100%; }
+.editor-expanded .form-grid, .editor-expanded label[for="automation-example"], .editor-expanded #automation-example { display:none; }
+.source-workbench .source-editor { width:100%; }

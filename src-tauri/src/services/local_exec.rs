@@ -14,6 +14,15 @@ impl Executor for LocalExecutor {
         timeout_s: u32,
         cancel: &Cancellation,
     ) -> Result<ExecOutput> {
+        self.execute_streaming(script, timeout_s, cancel, &mut |_| {})
+    }
+    fn execute_streaming(
+        &mut self,
+        script: &str,
+        timeout_s: u32,
+        cancel: &Cancellation,
+        output: &mut dyn FnMut(&[u8]),
+    ) -> Result<ExecOutput> {
         cancel.check()?;
         let mut command = Command::new("/bin/sh");
         command
@@ -24,17 +33,27 @@ impl Executor for LocalExecutor {
         if let Some(home) = std::env::var_os("HOME") {
             command.current_dir(home);
         }
-        run_command(command, script, timeout_s, cancel, &mut |_| Ok(()))
+        run_command_streaming(command, script, timeout_s, cancel, &mut |_| Ok(()), output)
     }
 }
 /// Stream structured controller events while retaining bounded diagnostics and
 /// the same process-group cleanup used for local scripts.
 pub(super) fn run_command(
+    command: Command,
+    script: &str,
+    timeout_s: u32,
+    cancel: &Cancellation,
+    on_stdout: &mut dyn FnMut(&[u8]) -> Result<()>,
+) -> Result<ExecOutput> {
+    run_command_streaming(command, script, timeout_s, cancel, on_stdout, &mut |_| {})
+}
+fn run_command_streaming(
     mut command: Command,
     script: &str,
     timeout_s: u32,
     cancel: &Cancellation,
     on_stdout: &mut dyn FnMut(&[u8]) -> Result<()>,
+    on_output: &mut dyn FnMut(&[u8]),
 ) -> Result<ExecOutput> {
     cancel.check()?;
     command
@@ -111,6 +130,7 @@ pub(super) fn run_command(
                 match stream.read(&mut bytes) {
                     Ok(0) => *eof = true,
                     Ok(length) => {
+                        on_output(&bytes[..length]);
                         if index == 0 {
                             on_stdout(&bytes[..length])?;
                         }

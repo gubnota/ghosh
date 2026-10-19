@@ -18,6 +18,8 @@ mod ansible;
 mod automation;
 mod history;
 mod local_exec;
+mod source_lint;
+pub(crate) use source_lint::lint_source;
 mod runs;
 mod ssh;
 use history::WorkspaceHistory;

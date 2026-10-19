@@ -96,6 +96,18 @@ pub(super) fn run(
         prepared.push((target.node_id.clone(), text));
     }
     for (node_id, payload) in prepared {
+        if let Ok(mut registry) = service.runs.lock()
+            && let Some(progress) = &mut registry.progress
+        {
+            progress.node_id = node_id.clone();
+            progress.step = "Starting Ansible controller".into();
+            progress.phase = if request.mode == RunMode::Check {
+                "check"
+            } else {
+                "apply"
+            }
+            .into();
+        }
         cancel.check()?;
         service.run_document(&request.automation, Some(&document.source))?;
         let private = tempfile::Builder::new()
@@ -124,11 +136,23 @@ pub(super) fn run(
                 let line: Vec<_> = pending.drain(..=end).collect();
                 if let Ok(value) = serde_json::from_slice::<TaskResult>(&line) {
                     count += 1;
+                    if let Ok(mut registry) = service.runs.lock()
+                        && let Some(progress) = &mut registry.progress
+                    {
+                        progress.completed_steps += 1;
+                        progress.step = redact(&value.name, &request.input);
+                    }
                     super::runs::append(service, report, value, &request.input)?;
-                } else if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&line)
-                    && let Some(error) = value.get("error").and_then(|v| v.as_str())
-                {
-                    diagnostic = error.chars().take(1000).collect();
+                } else if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&line) {
+                    if let Some(error) = value.get("error").and_then(|v| v.as_str()) {
+                        diagnostic = error.chars().take(1000).collect();
+                    }
+                    if let Some(task) = value.get("active_task").and_then(|v| v.as_str())
+                        && let Ok(mut registry) = service.runs.lock()
+                        && let Some(progress) = &mut registry.progress
+                    {
+                        progress.step = redact(task, &request.input);
+                    }
                 }
             }
             Ok(())

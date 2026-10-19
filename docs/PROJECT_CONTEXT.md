@@ -116,7 +116,9 @@
 - GPU acceptance, paid Pod provisioning, service restarts and model catalog are pending.
 - Native Check/Apply/verify, handler/retry/skip rules, up to eight local/SSH targets and Stop work.
 - Shell/Python/Deno execute on installed runtimes; no runtime/dependency installation.
-- Durable bounded Runs update at task/phase completion and export JSON; unknown outcomes never replay automatically.
+- Runs stream local/SSH logs, show step progress, survive navigation and export bounded durable phase reports.
+- Offline Monaco provides maximize, syntax/completion and local non-executing diagnostics; IDs have explicit rules.
+- Keep the app open; no daemon or continuation after exit. Unknown outcomes never replay automatically.
 
 ## Trust, secrets and approval policy
 - Local schema 1/2 workspaces default approved; manual Pause survives reload, reopen approves again.
@@ -184,7 +186,7 @@
 - Approve a concrete plan before the next software increment; avoid future scaffolding.
 - Keep small coherent changes; preserve user-owned prompt and .gitignore entries.
 - User requested sequential work: no parallel agents or builds for this increment.
-- Latest checks: formatting/Clippy, 81 Rust tests (3 opt-in skipped), 28 browser UI tests, contract freshness.
+- Latest checks: formatting/Clippy, 88 Rust tests (3 opt-in skipped), 32 browser UI tests, contract freshness.
 - Separate upstream controller integration and read-only Ansible over SSH passed on both authorized nodes.
 - Arm64 release built; native local/Debian/node3 TTY tests pass, screenshots in README.
 - Browser IPC fixtures verify presentation; they do not prove native execution.

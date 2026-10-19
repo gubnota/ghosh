@@ -392,3 +392,19 @@ retain event.key fallback, composition/Alt guards and terminal Ctrl input owners
 Consequences: No shortcut remapping UI is introduced. Existing Cmd shortcuts keep
 working on a Russian layout; keyboard-only fixtures cover both views and terminals.
 Related files: src/app/keyboard.ts, src/app/App.tsx, tests/ui/shell.spec.ts.
+
+
+# ADR-0025: Offline source editor and live task progress
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: Users need full-window code authoring and multi-step logs while using other sections.
+Decision: Bundle Monaco 0.57.0 and its workers/fonts, with native syntax-only shell/Python diagnostics.
+Reuse schema: 1 check/shell/verify for lightweight multi-step scripts; retain upstream Ansible.
+Stream bounded masked local/SSH output into native memory, merge progress into snapshots,
+and persist completed phases/final reports. Count main tasks once; dynamic Ansible has no fixed total.
+Consequences: Offline lazy editor adds bundle size. No daemon, app-exit continuation or new dialect.
+Navigation is independent of native workers; workspace mutation/close remains blocked while active.
+Related files: src/features/automation/SourceEditor.tsx, editorRuntime.ts, RunsView.tsx,
+src-tauri/src/services/source_lint.rs, runs.rs, crates/ghosh-core/src/runs.rs.
