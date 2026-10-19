@@ -14,6 +14,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tauri::{AppHandle, Emitter};
+mod automation;
 mod history;
 mod ssh;
 use history::WorkspaceHistory;

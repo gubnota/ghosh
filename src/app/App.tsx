@@ -17,6 +17,7 @@ import { ApprovalsView } from "../features/operations/ApprovalsView";
 import { NodesView } from "../features/nodes/NodesView";
 import { KeysView, type KeyAction } from "../features/keys/KeysView";
 
+import { AutomationView, type AutomationAction } from "../features/automation/AutomationView";
 import { TerminalView } from "../features/terminal/TerminalView";
 
 export function App() {
@@ -26,6 +27,10 @@ export function App() {
   const [terminalRequest, setTerminalRequest] = useState(0);
   const terminalSequence = useRef(0);
   const operations = useOperations();
+  const automationSequence = useRef(0);
+  const [automationRequest, setAutomationRequest] = useState<{ action: AutomationAction; scripts: boolean; sequence: number } | null>(null);
+  const [automationModal, setAutomationModal] = useState(false);
+  const [automationBusy, setAutomationBusy] = useState(false);
   const [inventoryModal, setInventoryModal] = useState(false);
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [keysModal, setKeysModal] = useState(false);
@@ -54,7 +59,7 @@ export function App() {
   const [keyboardHelp, setKeyboardHelp] = useState(false);
   const [appearance, setAppearance] = useState(loadAppearance);
   const [preferenceNotice, setPreferenceNotice] = useState("");
-  const current = useRef({ dirty, terminalCount, workspace, busy: startupBusy || busy || operations.mutating || inventoryBusy || keysBusy, confirming: startupBusy || recentOpen || !!confirmation || create || open || commandOpen || keyboardHelp || approvalModal || inventoryModal || keysModal || terminalModal }); current.current = { dirty, terminalCount, workspace, busy: startupBusy || busy || operations.mutating || inventoryBusy || keysBusy, confirming: startupBusy || recentOpen || !!confirmation || create || open || commandOpen || keyboardHelp || approvalModal || inventoryModal || keysModal || terminalModal };
+  const current = useRef({ dirty, terminalCount, workspace, busy: startupBusy || busy || operations.mutating || inventoryBusy || keysBusy || automationBusy, confirming: startupBusy || recentOpen || !!confirmation || create || open || commandOpen || keyboardHelp || approvalModal || inventoryModal || keysModal || terminalModal || automationModal }); current.current = { dirty, terminalCount, workspace, busy: startupBusy || busy || operations.mutating || inventoryBusy || keysBusy || automationBusy, confirming: startupBusy || recentOpen || !!confirmation || create || open || commandOpen || keyboardHelp || approvalModal || inventoryModal || keysModal || terminalModal || automationModal };
   const queuedOpen = useRef(false);
   const allowClose = useRef(false);
   const confirm = (title: string, action: () => void) => setConfirmation({ title, action });
@@ -63,7 +68,7 @@ export function App() {
   const accept = (s: WorkspaceSnapshot) => { setWorkspace(s); setDirty(false); void api.recent().then(setRecent).catch(() => {}); };
   const openWorkspace = (path: string) => guard(() => { void run(async () => { accept(await api.open(path)); setOpen(false); setRecentOpen(false); }); });
   const receiveOpen = async () => { if (current.current.busy || current.current.confirming) { queuedOpen.current = true; return; } queuedOpen.current = false; const path = await api.pending(); if (path) { queuedOpen.current = true; openWorkspace(path); } };
-  useEffect(() => { if (desktop && !busy && !confirmation && queuedOpen.current) { void receiveOpen().catch(e => setError(errorMessage(e))); } }, [busy, confirmation, create, open, commandOpen, keyboardHelp, approvalModal, inventoryModal, inventoryBusy, keysModal, keysBusy, terminalModal, operations.mutating, recentOpen, startupBusy]);
+  useEffect(() => { if (desktop && !busy && !confirmation && queuedOpen.current) { void receiveOpen().catch(e => setError(errorMessage(e))); } }, [busy, confirmation, create, open, commandOpen, keyboardHelp, approvalModal, inventoryModal, inventoryBusy, keysModal, keysBusy, terminalModal, automationModal, automationBusy, operations.mutating, recentOpen, startupBusy]);
   useEffect(() => {
     if (!desktop) return;
     let alive = true; const disposers: (() => void)[] = [];
@@ -143,6 +148,10 @@ export function App() {
     else if (command.id === "key.system" || command.id === "key.import" || command.id === "key.generate") {
       navigate("keys"); setKeyRequest({ action: command.id === "key.system" ? "system" : command.id === "key.generate" ? "generate" : "import", sequence: ++keySequence.current });
     }
+    else if (command.id.startsWith("playbook.") || command.id.startsWith("script.")) {
+      const scripts = command.id.startsWith("script."); navigate(scripts ? "scripts" : "playbooks");
+      setAutomationRequest({ scripts, action: command.id.endsWith(".edit") ? "edit" : command.id.endsWith(".import") ? "import" : "new", sequence: ++automationSequence.current });
+    }
     else if (command.id === "terminal.open") { navigate("terminal"); setTerminalRequest(++terminalSequence.current); }
     else if (command.destination) { navigate(command.destination); requestAnimationFrame(() => document.getElementById(`tab-${tabId(workspace?.id, command.destination!)}`)?.focus()); }
   };
@@ -197,10 +206,10 @@ export function App() {
         <section className="panel start-panel"><div className="terminal-prompt"><span>ghosh &gt;</span> workspace open<span className="cursor">▌</span></div><p>Create a portable .ghosh package or open one you already own.</p><div className="inline-actions"><button className="primary" disabled={!desktop || startupBusy || busy} onClick={chooseCreate}><Icon name="Plus" />Create workspace</button><button disabled={!desktop || startupBusy || busy} onClick={chooseOpen}><Icon name="FolderOpen" />Open workspace <kbd>⌘O</kbd></button><button onClick={() => setCommandOpen(true)}>Commands <kbd>⌘K</kbd></button></div><p className="field-help">Opening a package runs nothing. No account required.</p></section>
         <section className="panel"><RecentWorkspaces entries={recent} busy={busy} open={openWorkspace} forget={forgetRecent} /></section>
         <section className="panel"><h2>First workspace workflow</h2><ol className="onboarding"><li><span>01</span> Choose a system or custom SSH key file</li><li><span>02</span> Add a node and verify its host identity</li><li><span>03</span> Open a real terminal or create a YAML scenario</li><li><span>04</span> Review a plan, approve changes and inspect results</li></ol><p className="field-help">These operational services are being connected in the next implementation phases.</p></section>
-      </> : tab.destination === "terminal" && desktop ? <TerminalView workspace={workspace} incoming={incomingTerminal} incomingHandled={() => setIncomingTerminal(null)} active={tab.id === active} request={terminalRequest} requestHandled={() => setTerminalRequest(0)} modalChanged={setTerminalModal} sessionCountChanged={setTerminalCount} fontSize={appearance.fontSize * appearance.zoom / 100} /> : tab.destination === "nodes" && workspace ? <NodesView onTerminal={session => { setIncomingTerminal(session); navigate("terminal"); }} workspace={workspace} busy={busy || operations.mutating || inventoryBusy} request={nodeRequest} requestHandled={() => setNodeRequest(null)} modalChanged={setInventoryModal} busyChanged={setInventoryBusy} update={setWorkspace} /> : tab.destination === "keys" && desktop ? <KeysView workspace={workspace} update={setWorkspace} request={keyRequest} requestHandled={() => setKeyRequest(null)} modalChanged={setKeysModal} busyChanged={setKeysBusy} /> : tab.destination === "jobs" && desktop ? <JobsView operations={operations} /> : tab.destination === "approvals" && desktop ? <ApprovalsView operations={operations} modalChanged={setApprovalModal} /> : tab.destination === "settings" ? <SettingsView appearance={appearance} change={changeAppearance} /> : <div className="empty-state unavailable"><Icon name={destinations.find(item => item.id === tab.destination)?.icon || "Activity"} className="feature-icon" /><p className="eyebrow">{tab.title.toUpperCase()}</p><h1>{tab.title}</h1><p>{!workspace && !["jobs", "approvals"].includes(tab.destination) ? "Open a workspace to use this section." : "The native service for this section is not available in this build."}</p><p className="field-help">No connections, tasks or simulated operations have been started.</p><button onClick={() => setCommandOpen(true)}>Open commands <kbd>⌘K</kbd></button></div>}
+      </> : tab.destination === "terminal" && desktop ? <TerminalView workspace={workspace} incoming={incomingTerminal} incomingHandled={() => setIncomingTerminal(null)} active={tab.id === active} request={terminalRequest} requestHandled={() => setTerminalRequest(0)} modalChanged={setTerminalModal} sessionCountChanged={setTerminalCount} fontSize={appearance.fontSize * appearance.zoom / 100} /> : tab.destination === "nodes" && workspace ? <NodesView onTerminal={session => { setIncomingTerminal(session); navigate("terminal"); }} workspace={workspace} busy={busy || operations.mutating || inventoryBusy} request={nodeRequest} requestHandled={() => setNodeRequest(null)} modalChanged={setInventoryModal} busyChanged={setInventoryBusy} update={setWorkspace} /> : tab.destination === "keys" && desktop ? <KeysView workspace={workspace} update={setWorkspace} request={keyRequest} requestHandled={() => setKeyRequest(null)} modalChanged={setKeysModal} busyChanged={setKeysBusy} /> : ["playbooks", "scripts"].includes(tab.destination) && desktop && workspace ? <AutomationView workspace={workspace} scripts={tab.destination === "scripts"} request={automationRequest} requestHandled={() => setAutomationRequest(null)} modalChanged={setAutomationModal} busyChanged={setAutomationBusy} update={setWorkspace} /> : tab.destination === "jobs" && desktop ? <JobsView operations={operations} /> : tab.destination === "approvals" && desktop ? <ApprovalsView operations={operations} modalChanged={setApprovalModal} /> : tab.destination === "settings" ? <SettingsView appearance={appearance} change={changeAppearance} /> : <div className="empty-state unavailable"><Icon name={destinations.find(item => item.id === tab.destination)?.icon || "Activity"} className="feature-icon" /><p className="eyebrow">{tab.title.toUpperCase()}</p><h1>{tab.title}</h1><p>{!workspace && !["jobs", "approvals"].includes(tab.destination) ? "Open a workspace to use this section." : "The native service for this section is not available in this build."}</p><p className="field-help">No connections, tasks or simulated operations have been started.</p><button onClick={() => setCommandOpen(true)}>Open commands <kbd>⌘K</kbd></button></div>}
     </section>)}
     </AppShell>
-    {commandOpen && <CommandPopup dismiss={() => setCommandOpen(false)} execute={execute} context={{ desktop, workspace: !!workspace, busy: startupBusy || busy || operations.mutating || inventoryBusy || keysBusy, trusted: workspace?.trusted, editable: !!workspace && !workspace.read_only && !workspace.external_changed }} />}
+    {commandOpen && <CommandPopup dismiss={() => setCommandOpen(false)} execute={execute} context={{ desktop, workspace: !!workspace, busy: startupBusy || busy || operations.mutating || inventoryBusy || keysBusy || automationBusy, trusted: workspace?.trusted, editable: !!workspace && !workspace.read_only && !workspace.external_changed }} />}
     {recentOpen && <Dialog title="recent-title" dismiss={() => setRecentOpen(false)} busy={busy}>
       <h2 id="recent-title">Workspaces</h2>
       <div className="inline-actions"><button data-dialog-focus autoFocus disabled={busy} onClick={() => { setRecentOpen(false); chooseCreate(); }}><Icon name="Plus" />New workspace</button><button disabled={busy} onClick={() => { setRecentOpen(false); chooseOpen(); }}><Icon name="FolderOpen" />Open workspace</button>{workspace && <button disabled={busy} onClick={closeWorkspace}>Close workspace</button>}</div>

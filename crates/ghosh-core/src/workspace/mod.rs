@@ -1,3 +1,4 @@
+pub mod automation;
 pub mod document;
 pub mod identity;
 pub mod inventory;

@@ -13,7 +13,7 @@ Minimum macOS 14 execution and managed SSH route-loss acceptance remain pending.
 - [16](16-debian-pty.jpg): system SSH to debian.orb.local inside Ghosh; Linux ARM64.
 - [17](17-node3-pty.jpg): system SSH to node3.dabaga.cc inside Ghosh; Debian x86-64.
 - [18](18-split-pty.jpg): independent local sessions, both resized to 21×48 columns.
-- [20](20-ssh-review-debian.jpg): native managed SSH review of Debian endpoint,
+- [20](20-ssh-review-debian.jpg): historical managed SSH review of Debian endpoint,
   inherited file identity and known ED25519 server fingerprint.
 - [21](21-ssh-auth-debian.jpg): native managed Debian authentication PASS, 106ms.
 - [22](22-ssh-auth-node3.jpg): native managed node3 authentication PASS, 2298ms.
@@ -25,11 +25,19 @@ Minimum macOS 14 execution and managed SSH route-loss acceptance remain pending.
   Ctrl+C and Vim edit/save/exit; 2026-10-19, original JPEG 2320×1560.
 - [25](25-managed-ssh-split.jpg): managed node3 and Debian sessions, both resized
   to 21×48; 2026-10-19, original JPEG 2320×1560.
+- [26](26-playbook-examples.jpg): native Playbook examples catalog, release 0.1.2.
+- [27](27-playbook-editor.jpg): native source editor after successful validation;
+  create, save and reopen preserved the exact source in the disposable workspace.
+- [28](28-immediate-ssh-test.jpg): immediate Debian SSH authentication success
+  without an approval step; 109 ms, a single observation rather than a benchmark.
+  Node3 Test also passed (1,389 ms). Both Terminals opened directly with input focused.
+  Captures 26–28: 2026-10-19, original JPEG 2320×1560.
 
 Manual system-SSH checks used existing verified host keys with StrictHostKeyChecking=yes,
 BatchMode=yes and bounded connect attempts. Those checks changed no remote files.
 Captures 16–17 are manual system-SSH sessions inside a real local PTY.
-Captures 20–22 use the separate ghosh-ssh transport and native review service; both
+Captures 20–22 show the earlier approval UI, superseded in 0.1.2. They use the
+separate ghosh-ssh transport and native review service; both
 authenticate as vm with an explicitly selected existing file key and close without
 executing remote commands. Both match existing known-host records. Managed remote
 PTY acceptance is shown in 24–25. Persistent host enrollment, SFTP and facts remain pending.

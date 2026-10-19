@@ -6,7 +6,7 @@ a compact monospace layout, commands and keyboard-operated review dialogs.
 
 **Development status:** workspace persistence, node inventory editing, a file-based
 SSH key library, identity migration, jobs, approval infrastructure and real local
-PTY terminals and reviewed managed SSH terminals are working.
+PTY terminals, direct managed SSH terminals and Playbook/Script authoring are working.
 The approved [implementation plan](docs/IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md)
 is in progress. YAML scenario execution and the other service screens are still being implemented. Unavailable actions explain
 their status; prototype screenshots are never presented as working native features.
@@ -15,13 +15,19 @@ The approved [operational workflow supplement](docs/IMPLEMENTATION_PLAN_OPERATIO
 addresses the reported SSH/workspace gaps, existing Ansible playbooks, certificate
 timers, live monitoring and ComfyUI recipes (MiniMax H3, Wan 2.2, LTX 2.3, LoRA imports).
 Workspace restoration, cleanable history and local approval defaults are implemented.
-The remaining workflow sections describe planned work.
+The remaining workflow sections describe planned work. See the current [feature checklist](docs/FEATURE_STATUS.md).
 
 ## Screenshots
 
 These are actual native app captures, not Base44 mockups. Screenshots show public
 metadata for a disposable identity or an explicitly selected existing key; no private
 key material is shown.
+
+![Playbook examples in the native app](docs/evidence/ui-shell/26-playbook-examples.jpg)
+
+![Validated playbook source editor](docs/evidence/ui-shell/27-playbook-editor.jpg)
+
+![Immediate SSH test without an approval step](docs/evidence/ui-shell/28-immediate-ssh-test.jpg)
 
 ![Managed SSH terminal on Debian OrbStack](docs/evidence/ui-shell/24-managed-debian-pty.jpg)
 
@@ -34,12 +40,6 @@ key material is shown.
 ![Debian OrbStack SSH session inside Ghosh](docs/evidence/ui-shell/16-debian-pty.jpg)
 
 ![node3 SSH session inside Ghosh](docs/evidence/ui-shell/17-node3-pty.jpg)
-
-![Reviewing the Debian server key and workspace identity](docs/evidence/ui-shell/20-ssh-review-debian.jpg)
-
-![Native SSH authentication succeeded on Debian OrbStack](docs/evidence/ui-shell/21-ssh-auth-debian.jpg)
-
-![Native SSH authentication succeeded on node3](docs/evidence/ui-shell/22-ssh-auth-node3.jpg)
 
 ![Independent split terminal sessions](docs/evidence/ui-shell/18-split-pty.jpg)
 
@@ -106,10 +106,10 @@ legacy `recent.json` is migrated automatically.
    and save. In schema 2, choose SSH agent, per-connection password or file key and an inherited/explicit
    library identity. Saving inventory never connects to a host.
 6. Local workspaces are approved by default. To verify a direct node connection,
-   run `node test` or use **Test** in Nodes. Choose the node, review the resolved
-   public identity and server fingerprint, then **Authenticate**. This checks access
-   and closes the connection. **Terminal** in the node row or `node terminal` opens
-   a managed remote shell after the same review. See below.
+   use **Test** in Nodes: it connects immediately and then closes the connection.
+   **Terminal** in the node row opens a managed remote shell immediately.
+   `node test` / `node terminal` in Cmd+K offer a node picker, then **Connect**.
+   A password field appears only when the selected authentication requires it.
 7. Press **Cmd+K**, enter `terminal open`, then review **Open shell** to start
    `/bin/zsh` in your home directory. **New local terminal** creates another
    independent session. Up to eight sessions can stay open; **Split view** displays
@@ -139,11 +139,12 @@ the connection dialog asks for the passphrase without saving it. Never put priva
 | --- | --- |
 | Maintain a portable homelab or GPU-node inventory | Create/open packages; add/edit/import/remove nodes; review changes and conflicts |
 | Reuse SSH identities across workspaces | Existing system files, custom references/copies, Ed25519 generation, defaults and relinking |
-| Verify access before operating on a node | Reviewed direct authentication using file keys, SSH agent or a per-connection password |
+| Verify access before operating on a node | Direct SSH Test/Terminal without a confirmation step; file keys, SSH agent or a per-connection password |
 | Operate entirely from the keyboard | Command popup, navigation, tabs, scoped search/save and modal review |
 | Inspect local workspace work and authorizations | Real jobs, approval inbox and revocable native grants; execution integration pending |
 | Troubleshoot locally or on a remote node | Real local and managed SSH PTYs, xterm emulator, split/search and optional manual system SSH |
-| Run an Ansible-like scenario on selected nodes | Planned A7 YAML playbooks with check/plan/approve/apply/history; not arbitrary Ansible compatibility |
+| Author a scenario or script | Playbooks/Scripts: New, paste source, examples, edit, validate, save and recoverable remove; YAML, Shell, Python and Deno |
+| Run native scenarios or the existing Ansible project | Execution, target selection, cancellation and history are pending; Ansible project links can already be saved |
 | Manage browser profiles, routes, certificates or ComfyUI | Planned native services; current placeholder screens do not execute operations |
 | Give an agent controlled MCP access | Planned, disabled by default; no running MCP server yet |
 
@@ -153,7 +154,7 @@ the built Ghosh terminal** as `vm`, with strict host-key checking, on 2026-10-18
 The native local PTY also passed ANSI color, UTF-8, TTY sizing, split resizing,
 Ctrl+C, full-screen vi editing/save/exit and alternate-screen restoration checks. These terminal tests used the normal system SSH client inside the local shell.
 The separate managed SSH authentication service also passed on both hosts, in an
-opt-in native integration test and through the release app’s keyboard review flow.
+opt-in native integration test and through the earlier release app’s keyboard review flow.
 Native UI authentication completed in 106 ms for Debian and 2,298 ms for node3
 (single observations, not benchmarks). Both server keys matched existing trust records.
 On 2026-10-19, managed SSH PTYs passed on both hosts: input, resize, acknowledged
@@ -164,21 +165,46 @@ authentication is implemented but has not been exercised against a live target.
 Persistent host enrollment, jumps, SFTP, facts and plan/apply remain pending.
 The native release UI also passed managed split resizing to 21×48 on both nodes,
 Unicode paste and ANSI output; Debian passed Ctrl+C and Vim edit/save/exit.
+The 0.1.2 release UI passed immediate Test authentication on Debian and node3
+without an approval step; both Terminals opened directly with input focused.
 Only a disposable Debian `/tmp` editor file was written; no production
 configuration changed or software was installed. Full results and remaining
 gates are in [the task log](docs/TASK_LOG.md).
+
+## Create scenarios and scripts
+
+Open **Playbooks**, or run `playbook new` from Cmd+K. Choose **Use example** for
+read-only Linux facts, an idempotent temporary directory, or a link to the existing
+server-first-run Ansible project. Give it a safe ID, edit the YAML, choose
+**Validate**, then **Save**. **Import source** lets you paste a document into the
+same editor. **Edit** reopens the exact saved text, including comments. External
+changes require workspace reload before another save. **Remove** retains a
+recoverable `.removed` file in the same folder.
+
+**Scripts** / `script new` provides Shell, Python and Deno examples. Deno is a useful
+optional runtime for JavaScript/TypeScript on nodes; no precompiled server agent is
+required. It is not installed automatically. Script validation currently checks
+source bounds rather than interpreter syntax. Native YAML validation checks the
+supported task structure; Ansible links validate paths without reading or copying
+project files. These operations do not execute code.
+
+Sources live in the configured `playbooks/` and `scripts/` folders and participate
+in workspace revision/conflict detection. Run/Stop, target/variable forms, real
+Ansible Runner integration and durable run reports are the next implementation slice.
 
 ## Test a node connection
 
 Register a file key in **SSH Keys**, select it as the workspace default or node
 override, and use a schema-2 node with **File key** authentication. Alternatively,
-choose **SSH agent** or **Password (ask when connecting)**. Run `node test` from **Cmd+K**. **Review server**
-performs a bounded SSH handshake without sending the private key; review the endpoint,
-effective identity, SHA-256 server fingerprint and known/unknown status before
-**Authenticate**. Encrypted keys/password mode show a per-connection secret field.
-An unknown server needs an explicit checkbox for this single connection;
-verify its fingerprint independently first. Ghosh never silently accepts a changed
-known server key and does not write a new host-trust record in this increment.
+choose **SSH agent** or **Password (ask when connecting)**. **Test** and **Terminal**
+in the node row connect immediately. Cmd+K commands first offer a node picker.
+No separate SSH approval or fingerprint checkbox is shown. Encrypted keys and
+password mode ask only for the credential needed for that connection.
+
+As requested, unknown server keys are accepted for the current connection without
+confirmation. The native service still rejects a changed key in existing known_hosts
+and pins the exact key between its handshake and authentication. This increment
+does not persist newly observed keys; existing host-trust files remain unchanged.
 
 The service reads current-user `~/.ssh/known_hosts` and OrbStack's
 `~/.orbstack/ssh/known_hosts` when present. The selected file key comes from Ghosh's
@@ -192,7 +218,7 @@ records negotiate RSA SHA-2 rather than enabling legacy SHA-1 signatures.
 A review expires after two minutes and is single-use. Changes to workspace trust,
 configuration or the key registry invalidate it. Authentication reconnects and checks
 the exact reviewed server key again before resolving the private key natively.
-Errors appear in the dialog and **Jobs**; review again to retry. A successful test
+Errors appear in the dialog and **Jobs**; **Retry connection** obtains a fresh ticket. A successful test
 closes the session without opening a shell, gathering facts or changing remote files.
 
 ## Terminal and remote troubleshooting
@@ -336,7 +362,7 @@ To reproduce packaging on the corresponding native architecture:
 ```sh
 npm ci
 bash scripts/check.sh
-bash scripts/build-release.sh v0.1.1
+bash scripts/build-release.sh v0.1.2
 ```
 
 Output is under ignored `artifacts/`. Increment package.json (and lockfile),

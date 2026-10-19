@@ -1,12 +1,13 @@
 use crate::services::Services;
 use ghosh_core::{
     approvals::ApprovalDecisionRequest,
+    automation::*,
     contracts::*,
     operations::{JobKind, OperationsSnapshot},
     ssh::*,
     ssh_keys::*,
     terminal::*,
-    workspace::{identity::*, inventory::*, model::Node},
+    workspace::{automation::*, identity::*, inventory::*, model::Node},
 };
 use std::{path::Path, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
@@ -36,6 +37,46 @@ async fn run<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) 
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|_| AppError::new(ErrorCode::Internal))?
+}
+#[tauri::command]
+pub async fn automations_list(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: RevisionRequest,
+) -> Result<Vec<AutomationSummary>> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.automations(request)).await
+}
+#[tauri::command]
+pub async fn automation_read(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: AutomationReadRequest,
+) -> Result<AutomationDocument> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.automation_read(request)).await
+}
+#[tauri::command]
+pub async fn automation_preview(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: AutomationMutation,
+) -> Result<AutomationPreview> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.automation_preview(request)).await
+}
+#[tauri::command]
+pub async fn automation_commit(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: AutomationCommit,
+) -> Result<WorkspaceSnapshot> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.automation_commit(request)).await
 }
 #[tauri::command]
 pub async fn node_connection_preview(

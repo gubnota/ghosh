@@ -12,9 +12,9 @@
 - Working app: create/open/inspect/rename/reload/trust local workspaces.
 - File-key library, schema-2 identity migration and node CRUD are implemented.
 - Real local PTY/emulator and manual SSH to both authorized targets pass native smoke.
-- Managed direct SSH authentication and PTYs work with reviewed host fingerprints.
+- Managed direct SSH authentication and PTYs connect immediately; native exact-key checks remain.
 - File keys, encrypted keys and SSH agent passed live tests; per-call password is implemented.
-- Playbooks/runs, browser automation, scripting and MCP remain pending.
+- Playbook/Script authoring works; execution/runs, browsers, runtime scripting and MCP remain pending.
 
 ## Read first and navigate
 - Six memory files summarize actual behavior; keep them short and current.
@@ -60,7 +60,7 @@
 - Display-name changes do not rename the directory package.
 - All configuration paths are contained, non-overlapping and reject symlinks.
 - Canonical path and workspace-ID leases prevent cooperating duplicate writers.
-- Revision covers manifest and flat nodes/profiles/tunnels/certs/recipes TOML.
+- Revision covers manifest, flat entity TOML and flat Playbook/Script source files.
 - Writes require matching workspace ID, revision, current disk state and LocalUi.
 - Save syncs a temporary file, rechecks hashes, replaces atomically and syncs directory.
 - Creation publishes a complete hidden staging directory using no-replace rename.
@@ -98,10 +98,18 @@
 - Restricted command capabilities, caller/origin validation and CSP protect shell IPC.
 - Remote child views have no privileged IPC grants; none exist in M1.1.
 
+## Automation authoring
+- Playbooks/Scripts catalogs support create, paste, examples, edit, validate, save and recoverable remove.
+- Flat YAML/Ansible links and Shell/Python/Deno sources are revision-bound, at most 256 KiB each.
+- Invalid external sources open inert with validation issues; they cannot be saved through the editor.
+- Native YAML currently supports check/shell tasks and bounded handler references only.
+- Run/Stop, target forms, interpreter checks and durable reports are not connected.
+
 ## Trust, secrets and approval policy
 - Local schema 1/2 workspaces default approved; manual Pause survives reload, reopen approves again.
 - Newer schemas remain read-only/unapproved; approval alone never executes contents.
-- Trust alone grants no execution capability; direct authentication has a separate single-use review.
+- Test/Terminal connect without SSH confirmation per user request; unknown keys allowed per connection.
+- Native single-use handshake tickets still reject changed known keys and pin server identity.
 - Review binds workspace/revision/native session/key-registry revision/exact server key; 120s TTL.
 - Trust, reload and mutations rotate the native session and invalidate reviews/inflight context.
 - Configuration edits are authorized only for the local human UI principal.

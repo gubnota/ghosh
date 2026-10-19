@@ -135,6 +135,7 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Native preview performs a bounded unauthenticated handshake; checks current-user
   and OrbStack known_hosts read-only, prefers existing matching host algorithms,
   and fails changed known keys. Unknown needs allow_unknown for this connection only.
+  The local UI sets it automatically per user policy, with no confirmation dialog.
 - Up to eight UUID tickets; single-use, monotonic 120-second expiry. Bind exact raw
   host key, endpoint, node, workspace/revision/native epoch and key-registry revision.
 - Commit consumes first, reconnects, verifies the reviewed key and revalidates disk,
@@ -195,3 +196,18 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Linux legacy SecretStore resolve/put/delete return SecretUnavailable; no fallback.
 - Release tag version must match package.json, Cargo workspace and Tauri config.
   Workflow starts only for pushed v* tags; macOS job precedes Linux job.
+
+## Automation authoring (implemented; execution pending)
+- AutomationKind: playbook | ansible | shell | python | deno.
+- AutomationDocument {id, kind, source}; max 256 KiB UTF-8, safe entity ID, no NUL.
+- automations_list(RevisionRequest) -> AutomationSummary[]; automation_read({context,id,kind}) -> document.
+- automation_preview({context,document,replace,remove}) -> {digest,validation:{valid,name,task_count,issues}}.
+- automation_commit({mutation,digest}) -> WorkspaceSnapshot; rechecks source/path/disk/revision and caller.
+- Local UI only; paths derive from manifest folders and safe IDs, never caller-supplied write paths.
+- Save preserves source bytes; remove uses the existing recoverable .removed convention.
+- Flat .yml/.yaml, .ansible.yml, .sh/.py/.ts/.js participate in revision hashing.
+- YAML parser errors remain static; invalid external sources are inert and editable, not executable.
+- Native schema 1: name/tasks/check.command/shell.command; optional targets, timeout_s,
+  retries, creates, unless, changed_when and named handlers/notify. Unknown fields fail.
+- Ansible schema 1: name, absolute project, relative playbook and optional inventory;
+  validation does not access the linked project. No script execution/interpreter checks yet.

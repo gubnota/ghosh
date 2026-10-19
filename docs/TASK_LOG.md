@@ -321,3 +321,30 @@
 - Rebuilt arm64 release PASS (11.85 MiB). Native focus regression PASS: opened
   Debian then node3 from Terminal; immediate keyboard input ran in node3 without
   refocusing. Footer reports the package version (0.1.1).
+
+## 2026-10-19 — Immediate SSH and scenario/script authoring
+
+- User requested no SSH confirmation. Node Test/Terminal now authenticate directly;
+  only required password/passphrase input remains. Native single-use tickets still
+  pin the handshake key and reject changed known keys. New keys are accepted per
+  connection without enrollment. StrictMode/busy guards prevent duplicate opens.
+- Playbooks/Scripts now have catalogs, source editors, paste import, six examples,
+  native validation, revision-bound save, exact-source reopen and recoverable remove.
+  Source limits are 256 KiB. YAML task/handler structure and Ansible link paths are
+  validated; script validation checks bounds, not interpreter syntax. Opening an
+  Ansible link never reads/copies the external project or its credentials.
+- Run/Stop, targets, interpreter checks, Ansible Runner, durable runs, certificates,
+  timers, monitoring, ComfyUI, browser sessions/recordings and scene automation are
+  still pending. FEATURE_STATUS.md distinguishes working features from missing ones.
+- Checks: 72 Rust tests pass, 2 opt-in skipped; Clippy/format, generated-contract
+  freshness, strict frontend build and all 24 single-worker UI checks pass.
+  Native arm64 release 0.1.2 builds successfully (12.13 MiB).
+- Native create/validate/save/reopen passed in the disposable workspace, preserving
+  source. Immediate Test passed on Debian (109 ms) and node3 (1,389 ms); Debian
+  and node3 Terminals opened directly with input focused. No remote command was sent by this
+  smoke check. Original 1.ghosh was not edited. README captures 26–28 show this build;
+  older SSH approval screenshots are explicitly historical.
+- Reviewed previous tag CI: v0.1.1 macOS checks/build/artifact passed; Linux failed
+  during common checks before packaging (exit 101). Public diagnostics do not give
+  the Rust error; detailed logs require working GitHub authorization (current token
+  returned HTTP 401). Linux artifact/desktop acceptance is not yet claimed.

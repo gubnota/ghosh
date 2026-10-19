@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-automation"
+description = "Inert workspace automation authoring from the local shell"
+commands.allow = ["automations_list", "automation_read", "automation_preview", "automation_commit"]

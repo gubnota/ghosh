@@ -165,6 +165,11 @@ fn validated_files(files: BTreeMap<String, String>) -> Result<Loaded> {
         if path == "ghosh.toml" {
             continue;
         }
+        // Sources are inert and may be invalid drafts edited outside Ghosh.
+        // Their bytes still invalidate execution reviews and participate in CAS.
+        if super::automation::source_kind(&manifest, path).is_some() {
+            continue;
+        }
         let parsed = Document::parse(text)?;
         let node_file = Path::new(path).parent() == Some(Path::new(&manifest.paths.nodes));
         if parsed.schema()? > if node_file { manifest.schema } else { 1 } {
@@ -252,12 +257,20 @@ fn config_files(dir: &Dir, model: &Manifest) -> Result<BTreeMap<String, String>>
         &model.paths.tunnels,
         &model.paths.certs,
         &model.paths.recipes,
+        &model.paths.playbooks,
+        &model.paths.scripts,
     ] {
         safe_path(dir, folder)?;
         for entry in dir.read_dir(folder)? {
             let entry = entry?;
             let filename = entry.file_name();
-            if Path::new(&filename).extension().and_then(|s| s.to_str()) != Some("toml") {
+            let candidate = Path::new(folder).join(&filename);
+            let source =
+                super::automation::source_kind(model, candidate.to_str().ok_or_else(invalid)?)
+                    .is_some();
+            let entity = ![&model.paths.playbooks, &model.paths.scripts].contains(&folder)
+                && Path::new(&filename).extension().and_then(|s| s.to_str()) == Some("toml");
+            if !source && !entity {
                 continue;
             }
             let path = Path::new(folder)

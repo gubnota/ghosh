@@ -26,7 +26,11 @@ keyboard-operated 3D scene workflow with animation and video export.
   node3. Live password, persistent host enrollment, agent identity choice,
   keyboard-interactive, jumps and route-loss managed checks remain. Native release
   split sizing/Unicode passed on both; Debian Ctrl+C and Vim save/exit passed.
-- Slices 3–8: pending; no production playbook/certificate operation has run.
+- Slice 3 authoring: Playbooks/Scripts editors, examples, static validation and
+  revision-bound persistence implemented; execution/Ansible Runner/history pending.
+- Slices 4–8: pending; no production playbook/certificate operation has run.
+- 2026-10-19 user refinement: Test/Terminal connect without confirmation, allowing
+  unknown hosts per connection while retaining changed-known-key rejection.
 
 ## Baseline behavior before this supplement
 

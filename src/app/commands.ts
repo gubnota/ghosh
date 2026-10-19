@@ -17,7 +17,7 @@ export const destinations: { id: Destination; label: string; group: string; icon
   { id: "approvals", label: "Approvals", group: "System", icon: "Inbox", description: "Review and authorize pending operations" },
   { id: "settings", label: "Settings", group: "System", icon: "Settings", description: "Appearance, keyboard and application preferences" },
 ];
-export type CommandId = "workspace.open" | "workspace.create" | "workspace.close" | "workspace.recent" | "workspace.clear_history" | "node.add" | "node.edit" | "node.test" | "node.terminal" | "key.system" | "key.import" | "key.generate" | "playbook.new" | "playbook.import" | "playbook.edit" | "run.plan" | "run.apply" | "terminal.open" | "browser.open" | "route.switch" | "certificate.renew" | "recipe.apply" | "mcp.settings" | "jobs.open" | "approvals.open" | "settings.open" | "keyboard.open" | "navigation.focus";
+export type CommandId = "workspace.open" | "workspace.create" | "workspace.close" | "workspace.recent" | "workspace.clear_history" | "node.add" | "node.edit" | "node.test" | "node.terminal" | "key.system" | "key.import" | "key.generate" | "playbook.new" | "playbook.import" | "playbook.edit" | "script.new" | "script.import" | "script.edit" | "run.plan" | "run.apply" | "terminal.open" | "browser.open" | "route.switch" | "certificate.renew" | "recipe.apply" | "mcp.settings" | "jobs.open" | "approvals.open" | "settings.open" | "keyboard.open" | "navigation.focus";
 export type Command = { id: CommandId; label: string; syntax: string; group: string; destination?: Destination; shortcut?: string };
 export const commands: Command[] = [
   { id: "workspace.open", label: "Open workspace", syntax: "workspace open", group: "Workspace", shortcut: "⌘O" },
@@ -35,6 +35,9 @@ export const commands: Command[] = [
   { id: "playbook.new", label: "New playbook (scenario)", syntax: "playbook new", group: "Playbooks", destination: "playbooks" },
   { id: "playbook.import", label: "Import playbook", syntax: "playbook import", group: "Playbooks", destination: "playbooks" },
   { id: "playbook.edit", label: "Edit playbook", syntax: "playbook edit", group: "Playbooks", destination: "playbooks" },
+  { id: "script.new", label: "New script", syntax: "script new", group: "Scripts", destination: "scripts" },
+  { id: "script.import", label: "Import script", syntax: "script import", group: "Scripts", destination: "scripts" },
+  { id: "script.edit", label: "Edit script", syntax: "script edit", group: "Scripts", destination: "scripts" },
   { id: "run.plan", label: "Plan run", syntax: "run plan", group: "Runs", destination: "runs" },
   { id: "run.apply", label: "Apply run", syntax: "run apply", group: "Runs", destination: "runs" },
   { id: "terminal.open", label: "Open terminal", syntax: "terminal open", group: "Terminal", destination: "terminal" },
@@ -66,5 +69,6 @@ export function commandReason(command: Command, context: { desktop: boolean; wor
   if (command.id === "workspace.close") return context.desktop ? null : "Requires the Ghosh desktop app.";
   if (command.id === "node.test" || command.id === "node.terminal") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload this workspace before testing." : !context.trusted ? "Workspace operations are paused. Resume them in Overview." : null;
   if (["node.add", "node.edit"].includes(command.id)) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing inventory.";
+  if (command.id.startsWith("playbook.") || command.id.startsWith("script.")) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing automation.";
   return `${command.group} service is not available in this build.`;
 }

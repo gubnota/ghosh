@@ -1,6 +1,10 @@
 fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "automations_list",
+            "automation_read",
+            "automation_preview",
+            "automation_commit",
             "node_connection_preview",
             "node_connection_test",
             "terminal_open_local",

@@ -289,7 +289,7 @@ contracts are enumerated in the supplement.
 # ADR-0019: Shared terminal manager and ephemeral SSH credentials
 
 Date: 2026-10-19
-Status: Accepted
+Status: Accepted (SSH confirmation superseded by ADR-0020)
 
 Context: Nodes could only test unencrypted file keys while the editor offered agent
 auth. Users need a real terminal after saving a node and an unlocked-key path.
@@ -306,3 +306,21 @@ agent worker can outlive its deadline but cannot attach a terminal afterward.
 Related files: crates/ghosh-core/src/terminal.rs, crates/ghosh-core/src/ssh.rs,
 crates/ghosh-ssh/src/lib.rs, crates/ghosh-term/src/lib.rs,
 src-tauri/src/services/ssh.rs, src/features/nodes/ConnectionTest.tsx.
+
+# ADR-0020: Immediate SSH and inert automation authoring
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: User explicitly requests no confirmation when connecting to a node.
+Automation destinations lacked a way to create scripts or use examples.
+Decision: Test/Terminal immediately obtain and consume a native pinned ticket.
+Unknown hosts are allowed for that connection; changed known keys remain errors.
+Only required credentials prompt. Keep bounded inert source authoring in core;
+use typed revision/digest IPC, serde_yaml_ng and exact-source atomic persistence.
+Consequences: No SSH enrollment checkbox; no newly observed host persistence yet.
+Playbook/Script editors work before execution adapters. Validation never runs source
+or opens a linked Ansible project. Script syntax/runtime checks remain pending.
+Related files: src/features/nodes/ConnectionTest.tsx,
+crates/ghosh-core/src/automation.rs, crates/ghosh-core/src/workspace/automation.rs,
+src/features/automation, docs/FEATURE_STATUS.md.

@@ -11,6 +11,7 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
       window.fixtureTerminalInput = [];
       window.fixtureTerminalAck = [];
       window.fixtureTerminalCount = 0;
+      window.fixtureAutomations = [];
       window.fixtureKeys = {revision:'keys-1',default_key:null,keys:[]};
       window.fixtureWorkspace = { id: 'fixture', name: 'Test fleet', path: '/tmp/Test.ghosh', revision: 'r1', schema: 1, read_only: false, trusted: ${trusted}, external_changed: false, notices: [], nodes: [
         {id:'edge1',host:'192.0.2.1',port:22,user:'admin',labels:['web']}, {id:'db1',host:'192.0.2.2',port:22,user:'deploy',labels:['database']}
@@ -51,6 +52,10 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
           window.fixtureOperations.approvals.sequence++;
           return null;
         }
+        if (cmd === 'automations_list') return structuredClone(window.fixtureAutomations.map(document => ({id:document.id,kind:document.kind,validation:{valid:true,name:document.id,task_count:1,issues:[]}})));
+        if (cmd === 'automation_read') return structuredClone(window.fixtureAutomations.find(document => document.id === args.request.id && document.kind === args.request.kind));
+        if (cmd === 'automation_preview') {const valid = args.request.remove || args.request.document.source.includes('schema: 1') || ['shell','python','deno'].includes(args.request.document.kind);return {digest:'automation-fixture',validation:{valid,name:args.request.document.id,task_count:1,issues:valid?[]:['Invalid native YAML.']}};}
+        if (cmd === 'automation_commit') {const mutation=args.request.mutation;window.fixtureAutomations=window.fixtureAutomations.filter(document => document.id !== mutation.document.id || document.kind !== mutation.document.kind);if(!mutation.remove)window.fixtureAutomations.push(structuredClone(mutation.document));window.fixtureWorkspace.revision+='-automation';return structuredClone(window.fixtureWorkspace);}
         if (cmd === 'nodes_list') return window.fixtureWorkspace.nodes.map(node => ({...node,schema:1,auth:{method:'agent',key_ref:null,password_ref:null,agent_socket:null},tunnel:'direct',jump:null}));
         if (cmd === 'nodes_preview') {
           const change = args.request.change;
@@ -104,7 +109,7 @@ test("commands trap focus, restore invoker and refuse unavailable/unknown action
   await expect(page.getByRole("combobox")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("combobox")).toBeFocused();
-  await page.getByRole("combobox").fill("playbook new");
+  await page.getByRole("combobox").fill("run apply");
   await page.keyboard.press("Enter");
   await expect(popup).toBeVisible();
   await expect(popup.getByRole("status")).toContainText("not available");
@@ -437,41 +442,30 @@ test("split terminals fit both panes inside the available content width", async 
 });
 
 
-test("node test reviews endpoint and identity before explicit authentication", async ({ page }) => {
+test("node picker connects without a second approval", async ({ page }) => {
   await fixture(page, true);
   await command(page, "node test");
   const dialog = page.getByRole("dialog", { name: "Test node connection" });
   await expect(dialog.getByLabel("Node", { exact: true })).toBeFocused();
-  await dialog.getByRole("button", { name: "Review server" }).focus();
-  await page.keyboard.press("Enter");
-  await expect(dialog).toContainText("SHA256:host-fixture");
-  await expect(dialog).toContainText("SHA256:identity-fixture");
-  expect(await page.evaluate(() => (window as unknown as {fixtureCalls:string[]}).fixtureCalls.filter(cmd => cmd === "node_connection_test"))).toHaveLength(0);
-  await dialog.getByRole("button", { name: "Authenticate", exact: true }).focus();
+  await dialog.getByRole("button", { name: "Connect", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(dialog.getByRole("status")).toContainText("Authenticated successfully");
-  await dialog.getByRole("button", { name: "Done", exact: true }).focus();
-  await page.keyboard.press("Enter");
+  const calls = await page.evaluate(() => (window as any).fixtureCalls);
+  expect(calls.filter((cmd: string) => cmd === "node_connection_preview")).toHaveLength(1);
+  expect(calls.filter((cmd: string) => cmd === "node_connection_test")).toHaveLength(1);
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
   await expect(dialog).not.toBeVisible();
 });
 
-test("unknown SSH host requires explicit fingerprint verification", async ({ page }) => {
+test("inventory test connects immediately including unknown hosts", async ({ page }) => {
   await fixture(page, true, true);
-  await command(page, "node test");
+  await page.getByRole("navigation").getByRole("button", { name: "Nodes", exact: true }).click();
+  await page.getByRole("button", { name: "Test edge1", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Test node connection" });
-  await dialog.getByRole("button", { name: "Review server" }).click();
-  const authenticate = dialog.getByRole("button", { name: "Authenticate", exact: true });
-  await expect(authenticate).toBeDisabled();
-  const verify = dialog.getByRole("checkbox");
-  await verify.focus();
-  await page.keyboard.press("Enter");
-  await expect(authenticate).toBeDisabled();
-  await page.keyboard.press("Space");
-  await expect(authenticate).toBeEnabled();
-  await authenticate.focus();
-  await page.keyboard.press("Enter");
   await expect(dialog.getByRole("status")).toContainText("Authenticated successfully");
-  expect(await page.evaluate(() => (window as unknown as {fixtureAuthentication:{allow_unknown:boolean}}).fixtureAuthentication.allow_unknown)).toBe(true);
+  await expect(dialog.getByRole("checkbox")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).fixtureAuthentication.allow_unknown)).toBe(true);
+  expect(await page.evaluate(() => (window as any).fixtureCalls.filter((cmd: string) => cmd === "node_connection_test").length)).toBe(1);
 });
 
 test("themed selectors support keyboard commit, cancellation, typeahead and dialog focus", async ({ page }) => {
@@ -618,17 +612,15 @@ test("bracket shortcuts wrap tabs; close workspace guards draft then returns to 
 });
 
 
-test("node terminal opens from inventory after review and clears its connection secret", async ({ page }) => {
+test("node terminal only asks for required credentials and clears its connection secret", async ({ page }) => {
   await fixture(page, true, false, true);
   await page.getByRole("navigation").getByRole("button", { name: "Nodes", exact: true }).click();
   await page.getByRole("button", { name: "Terminal edge1", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Open node terminal" });
-  await dialog.getByRole("button", { name: "Review server", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(dialog).toContainText("SHA256:host-fixture");
+  await expect(dialog.getByLabel("Key passphrase", { exact: true })).toBeFocused();
   expect(await page.evaluate(() => (window as any).fixtureCalls.includes("terminal_open_node"))).toBe(false);
   await dialog.getByLabel("Key passphrase", { exact: true }).fill("disposable-ui-secret");
-  await dialog.getByRole("button", { name: "Open SSH terminal", exact: true }).focus();
+  await dialog.getByRole("button", { name: "Connect", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole("tab", { name: "Terminal", exact: true })).toHaveAttribute("aria-selected", "true");
@@ -638,9 +630,9 @@ test("node terminal opens from inventory after review and clears its connection 
   expect(await page.evaluate(() => (window as any).fixtureAuthentication.credential)).toBe("disposable-ui-secret");
   expect(await page.evaluate(() => JSON.stringify(localStorage).includes("disposable-ui-secret"))).toBe(false);
   await page.getByRole("button", { name: "Node terminal", exact: true }).click();
-  await dialog.getByRole("button", { name: "Review server", exact: true }).click();
+  await dialog.getByRole("button", { name: "Connect", exact: true }).click();
   await dialog.getByLabel("Key passphrase", { exact: true }).fill("second-disposable-secret");
-  await dialog.getByRole("button", { name: "Open SSH terminal", exact: true }).click();
+  await dialog.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const selectedPane = page.locator(".terminal-pane:not([hidden])");
   await expect(selectedPane.locator(".xterm-helper-textarea")).toBeFocused();
@@ -662,4 +654,50 @@ test("node terminal command is clickable and offers configured nodes", async ({ 
   await expect(dialog.getByLabel("Node", { exact: true })).toBeFocused();
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(await page.evaluate(() => (window as any).fixtureCalls.includes("terminal_open_node"))).toBe(false);
+});
+
+
+test("playbook and script editors validate, save exact source, reopen and protect drafts", async ({ page }) => {
+  await fixture(page);
+  await command(page, "playbook new");
+  const dialog = page.getByRole("dialog", { name: "Create playbook" });
+  await expect(dialog.getByLabel("ID", { exact: true })).toBeFocused();
+  const source = dialog.getByLabel("Source", { exact: true });
+  const original = await source.inputValue();
+  await source.fill("invalid yaml");
+  await dialog.getByRole("button", { name: "Validate", exact: true }).click();
+  await expect(dialog.getByRole("status")).toContainText("Invalid native YAML");
+  await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  const exactSource = original + "\n# preserve this comment 世界\n";
+  await source.fill(exactSource);
+  await dialog.getByRole("button", { name: "Validate", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await page.getByRole("button", { name: "Edit linux-facts", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit playbook" });
+  await expect(edit.getByLabel("Source", { exact: true })).toHaveValue(exactSource);
+  await edit.getByLabel("Source", { exact: true }).fill(exactSource + "# changed");
+  await page.keyboard.press("Escape");
+  await expect(edit).toContainText("Discard this unsaved draft?");
+  await edit.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await expect(edit.getByLabel("Source", { exact: true })).toHaveValue(exactSource + "# changed");
+  await page.keyboard.press("Escape");
+  await edit.getByRole("button", { name: "Discard draft", exact: true }).click();
+  await command(page, "script new");
+  const script = page.getByRole("dialog", { name: "Create script" });
+  await choose(script.getByLabel("Format", { exact: true }), "Deno · JS / TS");
+  await expect(script.getByLabel("Source", { exact: true })).toHaveValue(/Deno.hostname/);
+  await script.getByRole("button", { name: "Validate", exact: true }).click();
+  await script.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(script).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit system-report", exact: true })).toBeVisible();
+});
+
+test("inventory terminal opens directly once without approval", async ({ page }) => {
+  await fixture(page);
+  await page.getByRole("navigation").getByRole("button", { name: "Nodes", exact: true }).click();
+  await page.getByRole("button", { name: "Terminal edge1", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Terminal", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".xterm-helper-textarea")).toBeFocused();
+  expect(await page.evaluate(() => (window as any).fixtureTerminalCount)).toBe(1);
 });

@@ -6,11 +6,15 @@
 | crates/ghosh-core/src/contracts.rs | DTOs, static error envelope, cancellation token |
 | crates/ghosh-core/src/ssh_keys.rs | File-key registry, metadata, precedence, preview/commit and generator/inspector ports |
 | crates/ghosh-core/src/workspace/inventory.rs, identity.rs | Revisioned node CRUD, file identities and explicit schema migration |
+| crates/ghosh-core/src/automation.rs, workspace/automation.rs | Inert source validation/catalog, revision-bound authoring |
+| src-tauri/src/services/automation.rs | Local UI authoring bridge; no generic filesystem endpoint |
+| src/features/automation | Playbook/Script catalogs, examples and source editors |
+| crates/ghosh-core/tests/automation.rs | Persistence/inertness/conflict/path/schema tests |
 | crates/ghosh-core/src/terminal.rs | Bounded session/packet/size IPC DTOs and injected Pty port |
 | crates/ghosh-core/src/ssh.rs | Public review/result DTOs and per-call zeroizing credential request |
 | crates/ghosh-ssh/src/lib.rs | Direct transport, exact host/agent identity checks, file/agent/password authentication and nonblocking SSH PTY |
 | src-tauri/src/services/ssh.rs | Trusted context, expiring single-use reviews, native key resolution and authorized-host opt-in test |
-| src/features/nodes/ConnectionTest.tsx | Keyboard review, unknown-host opt-in and authentication results |
+| src/features/nodes/ConnectionTest.tsx | Immediate SSH connect, required credential input and authentication results |
 | crates/ghosh-term/src/lib.rs | Shared local/remote session manager, local PTY, replay/backpressure and process cleanup |
 | crates/ghosh-core/src/operations.rs | Bounded jobs, cancellation, closed stage vocabulary |
 | crates/ghosh-core/src/approvals.rs | Native contexts, exact grants, monotonic expiry and audit |
@@ -39,7 +43,7 @@
 | src/features/nodes, src/features/settings | Node CRUD/editor and local appearance/keyboard settings |
 | src/features/keys | Key library and workspace-identity migration dialogs |
 | src/features/terminal/TerminalView.tsx | xterm sessions, split/search/paste review and terminal focus |
-| tests/ui/shell.spec.ts, playwright.config.ts | 14 sequential browser presentation tests with explicit IPC fixtures |
+| tests/ui/shell.spec.ts, playwright.config.ts | 24 sequential browser presentation tests with explicit IPC fixtures |
 | src/app/ipc.ts | Typed commands and event subscriptions |
 | src/features/workspace/WorkspaceView.tsx | Name editing, inventory, local approval/pause, conflict/reload/details |
 | src/styles.css | Nightfly responsive keyboard-first desktop presentation |
@@ -74,6 +78,7 @@
 | [WORKSPACE_SCHEMA.md](WORKSPACE_SCHEMA.md) | Target A1–A8 schemas; later fields not fully activated |
 | [SCRIPTING_API.md](SCRIPTING_API.md) | Future A9 runtime/API contracts |
 | [MCP_SURFACE.md](MCP_SURFACE.md) | Future MCP B transport/tools/resources/approval contracts |
+| [FEATURE_STATUS.md](FEATURE_STATUS.md) | Current implemented and missing user workflows |
 | [MILESTONES.md](MILESTONES.md) | M1–M8 sequencing and gates |
 | [IMPLEMENTATION_PLAN_M1.md](IMPLEMENTATION_PLAN_M1.md) | Approved M1.1 plan, completion and deviations |
 | [BASE44_DESIGN_REQUEST.md](BASE44_DESIGN_REQUEST.md) | Keyboard-first Nightfly UI; 76 screens + key/playbook details; real terminal gates |

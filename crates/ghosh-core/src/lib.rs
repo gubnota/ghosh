@@ -1,4 +1,5 @@
 pub mod approvals;
+pub mod automation;
 pub mod contracts;
 pub mod operations;
 pub mod policy;

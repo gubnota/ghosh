@@ -4,8 +4,13 @@ import type { NodeConnectionRequest, NodeConnectionPreview, NodeConnectionCommit
 import type { TerminalSession, TerminalPacket, TerminalSize } from "../generated/contracts";
 import type { KeyGenerateRequest, KeyRelinkRequest, WorkspaceKeyRequest, WorkspaceKeyPreview, WorkspaceKeyCommit, NodeIdentityRequest, IdentityPreview, KeysSnapshot, KeyImportRequest, KeyImportPreview, KeyCommitRequest, KeyRegistryRequest } from "../generated/contracts";
 import type { Node, NodeMutationRequest, NodeCommitRequest, NodeChangePreview, AppError, ApprovalDecisionRequest, OperationsSnapshot, CreateRequest, RecentWorkspace, RenameRequest, RevisionRequest, TrustRequest, WorkspaceEvent, WorkspaceSnapshot } from "../generated/contracts";
+import type { AutomationSummary, AutomationDocument, AutomationReadRequest, AutomationMutation, AutomationPreview, AutomationCommit } from "../generated/contracts";
 export const desktop = isTauri();
 export const api = {
+  automations: (request: RevisionRequest) => invoke<AutomationSummary[]>("automations_list", { request }),
+  automationRead: (request: AutomationReadRequest) => invoke<AutomationDocument>("automation_read", { request }),
+  automationPreview: (request: AutomationMutation) => invoke<AutomationPreview>("automation_preview", { request }),
+  automationCommit: (request: AutomationCommit) => invoke<WorkspaceSnapshot>("automation_commit", { request }),
   connectionPreview: (request: NodeConnectionRequest) => invoke<NodeConnectionPreview>("node_connection_preview", { request }),
   connectionTest: (request: NodeConnectionCommit) => invoke<NodeConnectionResult>("node_connection_test", { request }),
   terminalOpenNode: (request: NodeTerminalRequest) => invoke<TerminalSession>("terminal_open_node", { request }),
