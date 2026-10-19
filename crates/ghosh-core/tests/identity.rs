@@ -146,7 +146,7 @@ fn migration_is_reviewed_single_file_backed_up_and_preserves_legacy_nodes() {
         .unwrap();
     assert_eq!(saved.schema, 2);
     assert!(!saved.read_only);
-    assert!(!saved.trusted);
+    assert!(saved.trusted);
     assert_eq!(fs::read(root.join(&preview.backup)).unwrap(), original);
     assert_eq!(
         fs::read_to_string(root.join("nodes/legacy.toml")).unwrap(),

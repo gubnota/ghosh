@@ -21,7 +21,9 @@ Normative target: [ghosh-prompt.md](ghosh-prompt.md), Appendices A/B.
 - Creation stages a complete package then publishes by atomic no-replace rename.
 - No recovery journal/distributed transaction; crashed hidden stages remain inert.
 - Hash validation cannot stop an arbitrary editor racing the final check/rename interval.
-- External edits invalidate trust/save; invalid reload preserves last valid in-memory state.
+- External edits invalidate execution reviews and block save; basic local approval remains.
+- Schema 1/2 local opens default approved; manual pause survives reload, reopen approves.
+- Newer schemas remain unapproved/read-only; opening executes nothing.
 - Reload rejects a replaced root or changed established profile store UUID.
 - Full future profile/cert/recipe fields are preserved but not activated/fully validated.
 
@@ -34,6 +36,9 @@ All return a typed result or AppError; filesystem operations run off the UI thre
 | --- | --- | --- |
 | workspace_create | request: {parent, name} | WorkspaceSnapshot |
 | workspace_open | path | WorkspaceSnapshot |
+| workspace_startup | none | Active snapshot, queued explicit open, last-open restore, or null (in that order) |
+| workspace_close | request: {workspace_id, revision} | null; rejects stale context/running jobs, clears last-open and releases watcher/leases/PTYs |
+| workspace_forget_recent | path: string or null | Updated recents; null clears all, never deletes package files |
 | workspace_snapshot | none | WorkspaceSnapshot or null |
 | workspace_rename | request: {workspace_id, revision, name} | WorkspaceSnapshot |
 | workspace_reload | request: {workspace_id, revision} | WorkspaceSnapshot |
@@ -44,6 +49,10 @@ All return a typed result or AppError; filesystem operations run off the UI thre
 | operations_snapshot | none | OperationsSnapshot: jobs + approvals |
 | jobs_cancel | id | JobsSnapshot |
 | approvals_decide | request: {id, decision} | ApprovalsSnapshot |
+
+History: atomic app-local workspaces.json, ten-entry MRU and independent nullable last.
+Migrate legacy recent.json only when new state is absent. Close clears last, retaining MRU.
+Remove/clear clears matching last; persistence failures preserve the in-memory history.
 
 - Snapshot: id/name/path/revision/schema/read_only/trusted/external_changed/nodes/notices.
 - NodeSummary: id/host/port/user/labels; no authentication or secret values.
@@ -62,7 +71,8 @@ All return a typed result or AppError; filesystem operations run off the UI thre
 - JSON Schemas are structural projections; runtime adds policy/cross-file validation.
 
 ## Trust and secrets (implemented boundary)
-- Trust is session-local; opening/reloading resets it, external changes invalidate it.
+- Local approval defaults on for supported schemas; pause survives reload and resets on reopen.
+- External changes retain that setting but block writes/effects and invalidate execution reviews.
 - Only LocalUi edits configuration; trust alone cannot authorize remote execution.
 - Trusted local UI may request the separate direct-authentication review/test below.
 - SecretRef parses secret://keychain/<id>, with bounded alphanumeric/underscore/hyphen ID.
@@ -166,6 +176,7 @@ All return a typed result or AppError; filesystem operations run off the UI thre
 - Select is a button combobox with a top-layer listbox; no native HTML select popup.
 - Keyboard: open with Return/Space/arrows, highlight via arrows/Home/End/typeahead,
   Return commits, Escape cancels without dismissing its parent dialog, Tab advances.
+- Cmd+[ / Cmd+] cycle tabs with wrap; Cmd+Shift+W closes the workspace with draft/session guards.
 - Cmd+1–9 selects displayed app tabs; absent positions do nothing. Cmd+W retains
   dirty/session guards; Cmd+Q retains ordinary native behavior.
 - Node select-all applies to visible rows and preserves hidden selections; mixed

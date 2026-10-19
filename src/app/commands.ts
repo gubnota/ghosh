@@ -17,11 +17,14 @@ export const destinations: { id: Destination; label: string; group: string; icon
   { id: "approvals", label: "Approvals", group: "System", icon: "Inbox", description: "Review and authorize pending operations" },
   { id: "settings", label: "Settings", group: "System", icon: "Settings", description: "Appearance, keyboard and application preferences" },
 ];
-export type CommandId = "workspace.open" | "workspace.create" | "node.add" | "node.edit" | "node.test" | "key.system" | "key.import" | "key.generate" | "playbook.new" | "playbook.import" | "playbook.edit" | "run.plan" | "run.apply" | "terminal.open" | "browser.open" | "route.switch" | "certificate.renew" | "recipe.apply" | "mcp.settings" | "jobs.open" | "approvals.open" | "settings.open" | "keyboard.open" | "navigation.focus";
+export type CommandId = "workspace.open" | "workspace.create" | "workspace.close" | "workspace.recent" | "workspace.clear_history" | "node.add" | "node.edit" | "node.test" | "key.system" | "key.import" | "key.generate" | "playbook.new" | "playbook.import" | "playbook.edit" | "run.plan" | "run.apply" | "terminal.open" | "browser.open" | "route.switch" | "certificate.renew" | "recipe.apply" | "mcp.settings" | "jobs.open" | "approvals.open" | "settings.open" | "keyboard.open" | "navigation.focus";
 export type Command = { id: CommandId; label: string; syntax: string; group: string; destination?: Destination; shortcut?: string };
 export const commands: Command[] = [
   { id: "workspace.open", label: "Open workspace", syntax: "workspace open", group: "Workspace", shortcut: "⌘O" },
   { id: "workspace.create", label: "Create workspace", syntax: "workspace create", group: "Workspace" },
+  { id: "workspace.close", label: "Close workspace", syntax: "workspace close", group: "Workspace", shortcut: "⌘⇧W" },
+  { id: "workspace.recent", label: "Recent workspaces", syntax: "workspace recent", group: "Workspace" },
+  { id: "workspace.clear_history", label: "Clear workspace history", syntax: "workspace clear history", group: "Workspace" },
   { id: "node.add", label: "Add node", syntax: "node add", group: "Nodes", destination: "nodes", shortcut: "⌘N" },
   { id: "node.edit", label: "Edit node", syntax: "node edit", group: "Nodes", destination: "nodes" },
   { id: "node.test", label: "Test connection", syntax: "node test", group: "Nodes", destination: "nodes" },
@@ -57,9 +60,10 @@ export function searchCommands(query: string): Command[] {
 export function commandReason(command: Command, context: { desktop: boolean; workspace: boolean; busy: boolean; editable?: boolean; trusted?: boolean }): string | null {
   if (context.busy) return "Wait for the current operation to finish.";
   if (["settings.open", "keyboard.open", "navigation.focus"].includes(command.id)) return null;
-  if (["terminal.open", "workspace.open", "workspace.create", "jobs.open", "approvals.open", "key.system", "key.import", "key.generate"].includes(command.id)) return context.desktop ? null : "Requires the Ghosh desktop app.";
+  if (["terminal.open", "workspace.open", "workspace.create", "workspace.recent", "workspace.clear_history", "jobs.open", "approvals.open", "key.system", "key.import", "key.generate"].includes(command.id)) return context.desktop ? null : "Requires the Ghosh desktop app.";
   if (!context.workspace) return "Open a workspace first.";
-  if (command.id === "node.test") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload this workspace before testing." : !context.trusted ? "Trust this workspace in Overview before testing." : null;
+  if (command.id === "workspace.close") return context.desktop ? null : "Requires the Ghosh desktop app.";
+  if (command.id === "node.test") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload this workspace before testing." : !context.trusted ? "Workspace operations are paused. Resume them in Overview." : null;
   if (["node.add", "node.edit"].includes(command.id)) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing inventory.";
   return `${command.group} service is not available in this build.`;
 }

@@ -203,7 +203,6 @@ impl Workspace {
             cancel,
         )?;
         self.loaded = candidate;
-        self.trusted = false;
         Ok(self.snapshot())
     }
 }

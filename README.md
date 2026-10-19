@@ -12,6 +12,12 @@ is in progress. Manual SSH works inside the terminal. Managed SSH terminal sessi
 YAML scenario execution and the other service screens are still being implemented. Unavailable actions explain
 their status; prototype screenshots are never presented as working native features.
 
+The approved [operational workflow supplement](docs/IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
+addresses the reported SSH/workspace gaps, existing Ansible playbooks, certificate
+timers, live monitoring and ComfyUI recipes (MiniMax H3, Wan 2.2, LTX 2.3, LoRA imports).
+Workspace restoration, cleanable history and local approval defaults are implemented.
+The remaining workflow sections describe planned work.
+
 ## Screenshots
 
 These are actual native app captures, not Base44 mockups. Screenshots show public
@@ -70,6 +76,14 @@ not configured. The manifest display name can change without moving the package.
 Use **Open workspace** to switch packages. Finder document-open requests use the
 same validation and unsaved-change confirmation.
 
+At startup Ghosh restores the last workspace; an explicit Finder request takes priority.
+Use the workspace switcher or `workspace recent` to search/open recent packages,
+create/open/close a workspace, remove an entry or **Clear history**. Removing history
+never deletes workspace files. Closing a workspace prevents automatic restoration
+until another one is opened. Missing or locked packages show a recovery error with
+Open/New/history still available. History is stored locally in `workspaces.json`;
+legacy `recent.json` is migrated automatically.
+
 ## Use the app
 
 1. Choose **Create workspace**, or press **Cmd+O** to open a `.ghosh` directory
@@ -88,8 +102,8 @@ same validation and unsaved-change confirmation.
 5. In **Nodes**, add/edit/import one TOML definition, review the proposed change,
    and save. In schema 2, choose SSH agent or file key and an inherited/explicit
    library identity. Saving inventory never connects to a host.
-6. To verify a direct node connection, trust the current workspace in **Overview**,
-   then run `node test` or use **Test** in Nodes. Choose the node, review the resolved
+6. Local workspaces are approved by default. To verify a direct node connection,
+   run `node test` or use **Test** in Nodes. Choose the node, review the resolved
    public identity and server fingerprint, then **Authenticate**. This checks access
    and closes the connection; it does not start a terminal or run commands. See below.
 7. Press **Cmd+K**, enter `terminal open`, then review **Open shell** to start
@@ -99,7 +113,8 @@ same validation and unsaved-change confirmation.
 8. Use **Ctrl+Tab / Ctrl+Shift+Tab** between app tabs, **Cmd+F** for the current
    view’s search, **Cmd+S** to review a form, and **Cmd+W** to close a tab.
    **Cmd+1–9** selects the corresponding displayed tab; absent positions do nothing.
-   **Cmd+Q** keeps the normal macOS quit behavior.
+   **Cmd+[ / Cmd+]** cycles tabs. **Cmd+Shift+W** closes the workspace, preserving
+   its files and asking about drafts or active terminals. **Cmd+Q** keeps normal quit behavior.
    **Cmd+Shift+E** focuses the selected navigation item. Settings controls font,
    density and zoom; preferences survive restart.
 
@@ -144,8 +159,7 @@ gates are in [the task log](docs/TASK_LOG.md).
 ## Test a node connection
 
 Register an unencrypted file key in **SSH Keys**, select it as the workspace default
-or node override, and use a schema-2 node with **File key** authentication. After
-trusting the current workspace, run `node test` from **Cmd+K**. **Review server**
+or node override, and use a schema-2 node with **File key** authentication. Run `node test` from **Cmd+K**. **Review server**
 performs a bounded SSH handshake without sending the private key; review the endpoint,
 effective identity, SHA-256 server fingerprint and known/unknown status before
 **Authenticate**. An unknown server needs an explicit checkbox for this single test;
@@ -226,7 +240,7 @@ remain acceptance gates.
   manifest and sync the directory. Creation publishes a complete staged directory
   with no-replace rename. A crash can leave a hidden staging directory; it is never
   treated as a workspace or removed automatically.
-- External edits invalidate trust and block saving until validated reload.
+- External edits invalidate execution reviews and block saving until validated reload.
   Native notifications are debounced; a bounded configuration revision probe every
   two seconds covers missed events. Invalid reload preserves the last valid view.
 - Schemas 1 and 2 validate IDs, UTC timestamps, contained non-overlapping paths, node
@@ -234,9 +248,9 @@ remain acceptance gates.
   Schema 2 adds opaque workspace/node file-key IDs and permits unchanged schema 1 nodes.
   Newer **manifest** schemas open read-only. Newer entity schemas are rejected.
   Other future entity fields are preserved but not activated or fully validated.
-- Trust is held in memory, resets on reopen/reload, and grants no remote execution
-  through managed services. Reviewed authentication tests require trust and a separate
-  single-use confirmation. Private keys and passphrases are absent from package
+- Local workspaces are approved by default. **Pause operations** suspends managed
+  actions until resumed (or reopened); reload preserves that pause. Approval alone
+  executes nothing. SSH authentication still needs a separate single-use review. Private keys and passphrases are absent from package
   files and frontend key DTOs. Local terminal input/output naturally may contain
   sensitive text and is not recorded by Ghosh.
   Keychain adapters require an explicit trusted native-service context.

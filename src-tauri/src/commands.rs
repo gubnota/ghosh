@@ -314,6 +314,36 @@ pub async fn nodes_commit(
     .await
 }
 #[tauri::command]
+pub async fn workspace_startup(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+) -> Result<Option<WorkspaceSnapshot>> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    let app = window.app_handle().clone();
+    run(move || service.startup(&app)).await
+}
+#[tauri::command]
+pub async fn workspace_close(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: RevisionRequest,
+) -> Result<()> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.close(request)).await
+}
+#[tauri::command]
+pub async fn workspace_forget_recent(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    path: Option<String>,
+) -> Result<Vec<RecentWorkspace>> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.forget_recent(path)).await
+}
+#[tauri::command]
 pub async fn workspace_open(
     window: WebviewWindow,
     state: State<'_, Arc<Services>>,

@@ -26,11 +26,12 @@
 | crates/ghosh-core/tests/policy.rs | Three policy/reference/redaction tests |
 | crates/ghosh-core/examples/export_contracts.rs | Deterministic TS/JSON Schema generation and --check |
 | src-tauri/src/main.rs, lib.rs | Desktop entry, service composition and early Finder document queue |
-| src-tauri/src/services.rs | Active workspace/watch, recent history, bounded pending requests/tests |
+| src-tauri/src/services/history.rs | Bounded atomic MRU/last-open storage and legacy migration |
+| src-tauri/src/services.rs | Active workspace/watch, lifecycle/startup priority, bounded pending requests/tests |
 | src-tauri/src/commands.rs | 34 workspace/key/node/SSH/terminal/operation IPC commands, caller validation/test, blocking-work bridge |
 | src-tauri/src/platform | Native OpenSSH key generator/inspector; separate Keychain adapter and optional integration test |
 | src/main.tsx | React entry |
-| src/app/App.tsx | Welcome/create/open/recent, busy/error/unsaved/document-open coordination |
+| src/app/App.tsx | Welcome/create/open/close/restore/recent, busy/error/draft/document-open guards |
 | src/app/AppShell.tsx, commands.ts, tabs.ts | Nightfly shell, action registry and stable tabs |
 | src/components/Dialog.tsx, src/app/CommandPopup.tsx | Keyboard popup, trapped modal focus and restoration |
 | src/app/useOperations.ts | Subscribe-before-fetch operation snapshots and sequence reconciliation |
@@ -40,7 +41,7 @@
 | src/features/terminal/TerminalView.tsx | xterm sessions, split/search/paste review and terminal focus |
 | tests/ui/shell.spec.ts, playwright.config.ts | 14 sequential browser presentation tests with explicit IPC fixtures |
 | src/app/ipc.ts | Typed commands and event subscriptions |
-| src/features/workspace/WorkspaceView.tsx | Name editing, inventory, trust, conflict/reload/details |
+| src/features/workspace/WorkspaceView.tsx | Name editing, inventory, local approval/pause, conflict/reload/details |
 | src/styles.css | Nightfly responsive keyboard-first desktop presentation |
 | src/generated/contracts.ts | Generated core DTO projection |
 | schemas/workspace.schema.json, node.schema.json | Generated structural schemas |
@@ -56,7 +57,7 @@
 - Linux legacy-secret boundary: src-tauri/src/platform/unavailable.rs; no plaintext fallback.
 - Instructions/licenses: README.md, LICENSE-MIT, LICENSE-APACHE, .gitignore.
 - Runtime package: <workspace>.ghosh/ghosh.toml and configured entity directories.
-- App data: Tauri app_data_dir; recent.json, ssh/registry.json, ssh/<uuid>.key and locks, outside packages.
+- App data: Tauri app_data_dir; workspaces.json (legacy recent.json migration), ssh/registry.json, ssh/<uuid>.key and locks, outside packages.
 - Build output (ignored): target/aarch64-apple-darwin/release/bundle/macos/Ghosh.app.
 - Dependency/output caches (ignored): node_modules/, .cache/, dist/, target/.
 
@@ -79,6 +80,7 @@
 | [SSH_KEY_STORAGE.md](SSH_KEY_STORAGE.md) | Implemented file-key contract; remaining unlock/SSH integration |
 | [base44/README.md](base44/README.md) | Capture guide, ten native JPEGs, offline gallery and handoff ZIP |
 | [IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md](IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md) | Approved sequential native UI/services plan; 14 phases and acceptance gates |
+| [IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md](IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md) | Accepted operational supplement: SSH auth/PTYs, Ansible, certificate timers, metrics/logs, named ComfyUI recipes, browsers and scenes |
 | [base44/reference-app/INTERACTION_INVENTORY.md](base44/reference-app/INTERACTION_INVENTORY.md) | Live Base44 reference: 32 interaction groups, commands/settings, observed limits |
 | [base44/reference-app/README.md](base44/reference-app/README.md) | 33 reference screenshots, manifest and checksums; separate from native captures |
 

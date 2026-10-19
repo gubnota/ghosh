@@ -14,7 +14,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tauri::{AppHandle, Emitter};
+mod history;
 mod ssh;
+use history::WorkspaceHistory;
 
 struct Active {
     workspace: Workspace,
@@ -52,7 +54,7 @@ pub struct Services {
     approvals: Mutex<Approvals>,
     keys: Mutex<Result<FileKeyRegistry>>,
     active: Mutex<Option<Active>>,
-    recent: Mutex<Vec<RecentWorkspace>>,
+    history: Mutex<WorkspaceHistory>,
     pending: Arc<DocumentOpenQueue>,
     data_dir: PathBuf,
     pub _secrets: Box<dyn SecretStore>,
@@ -68,14 +70,7 @@ impl Services {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&data_dir, fs::Permissions::from_mode(0o700))?;
         }
-        let recent = fs::read(data_dir.join("recent.json"))
-            .ok()
-            .filter(|bytes| bytes.len() < 64 * 1024)
-            .and_then(|bytes| serde_json::from_slice::<Vec<RecentWorkspace>>(&bytes).ok())
-            .unwrap_or_default()
-            .into_iter()
-            .take(10)
-            .collect();
+        let history = WorkspaceHistory::load(&data_dir);
         // Damaged key metadata must not block unrelated workspace recovery.
         let keys = FileKeyRegistry::open(&data_dir.canonicalize()?.join("ssh"));
         Ok(Self {
@@ -85,7 +80,7 @@ impl Services {
             approvals: Mutex::new(Approvals::default()),
             keys: Mutex::new(keys),
             active: Mutex::new(None),
-            recent: Mutex::new(recent),
+            history: Mutex::new(history),
             pending,
             data_dir,
             _secrets: crate::platform::secret_store(),
@@ -212,26 +207,65 @@ impl Services {
         self.pending.next()
     }
     pub fn recent(&self) -> Result<Vec<RecentWorkspace>> {
-        Ok(self.recent.lock().map_err(poisoned)?.clone())
+        Ok(self.history.lock().map_err(poisoned)?.recent.clone())
+    }
+    pub fn forget_recent(&self, path: Option<String>) -> Result<Vec<RecentWorkspace>> {
+        self.edit_history(|history| history.forget(path.as_deref()))?;
+        self.recent()
+    }
+    fn edit_history(&self, edit: impl FnOnce(&mut WorkspaceHistory)) -> Result<()> {
+        let mut stored = self.history.lock().map_err(poisoned)?;
+        let mut next = stored.clone();
+        edit(&mut next);
+        next.save(&self.data_dir)?;
+        *stored = next;
+        Ok(())
     }
     fn remember(&self, snapshot: &WorkspaceSnapshot) -> Result<()> {
-        let mut recent = self.recent.lock().map_err(poisoned)?;
-        recent.retain(|entry| entry.path != snapshot.path);
-        recent.insert(
-            0,
-            RecentWorkspace {
-                name: snapshot.name.clone(),
-                path: snapshot.path.clone(),
-            },
-        );
-        recent.truncate(10);
-        let temp = self.data_dir.join("recent.json.tmp");
-        fs::write(
-            &temp,
-            serde_json::to_vec(&*recent).map_err(|_| AppError::new(ErrorCode::Internal))?,
-        )?;
-        fs::rename(temp, self.data_dir.join("recent.json"))?;
+        self.edit_history(|history| history.remember(&snapshot.name, &snapshot.path))
+    }
+    pub fn close(&self, request: RevisionRequest) -> Result<()> {
+        let mut active = self.active.lock().map_err(poisoned)?;
+        if self.jobs.snapshot()?.jobs.iter().any(|job| {
+            matches!(
+                job.state,
+                ghosh_core::operations::JobState::Running
+                    | ghosh_core::operations::JobState::Cancelling
+            )
+        }) {
+            return Err(AppError::new(ErrorCode::Busy));
+        }
+        let snapshot = active
+            .as_ref()
+            .ok_or_else(|| AppError::new(ErrorCode::Denied))?
+            .workspace
+            .snapshot();
+        if snapshot.id != request.workspace_id || snapshot.revision != request.revision {
+            return Err(AppError::new(ErrorCode::Conflict));
+        }
+        self.edit_history(|history| history.last = None)?;
+        self.invalidate_reviews(&mut active)?;
+        self.terminals.close_all();
+        *active = None;
         Ok(())
+    }
+    fn startup_path(&self) -> Result<Option<String>> {
+        // Explicit native opens win over automatic restoration.
+        Ok(self
+            .pending
+            .next()?
+            .or(self.history.lock().map_err(poisoned)?.last.clone()))
+    }
+    pub fn startup(&self, app: &AppHandle) -> Result<Option<WorkspaceSnapshot>> {
+        let mut active = self.active.lock().map_err(poisoned)?;
+        if let Some(current) = active.as_ref() {
+            return Ok(Some(current.workspace.snapshot()));
+        }
+        let Some(path) = self.startup_path()? else {
+            return Ok(None);
+        };
+        let workspace = Workspace::open(Path::new(&path), &self.data_dir.join("locks"))?;
+        self.activate(workspace, &mut active, app).map(Some)
     }
     fn activate(
         &self,
@@ -253,6 +287,7 @@ impl Services {
                 "Recent workspace history could not be saved. The workspace is still open.".into(),
             );
         }
+        self.terminals.close_all();
         *active = Some(Active {
             context: ApprovalContext::new(snapshot.id.clone(), snapshot.revision.clone()),
             workspace,
@@ -267,7 +302,13 @@ impl Services {
         if let Some(current) = active.as_mut()
             && current.workspace.root() == canonical
         {
-            return Ok(current.workspace.snapshot());
+            let mut snapshot = current.workspace.snapshot();
+            if self.remember(&snapshot).is_err() {
+                snapshot
+                    .notices
+                    .push("Recent workspace history could not be saved.".into());
+            }
+            return Ok(snapshot);
         }
         let workspace = Workspace::open(path, &self.data_dir.join("locks"))?;
         self.activate(workspace, &mut active, app)
@@ -400,6 +441,66 @@ mod tests {
     use ghosh_core::approvals::{
         ApprovalBinding, ApprovalDecision, ApprovalState, Requester, content_digest,
     };
+
+    #[test]
+    fn explicit_open_precedes_restore_and_close_releases_workspace() {
+        let (tmp, service, _) = approval_fixture();
+        let snapshot = service.snapshot().unwrap().unwrap();
+        service.remember(&snapshot).unwrap();
+        service.pending.enqueue("/explicit.ghosh".into()).unwrap();
+        assert_eq!(
+            service.startup_path().unwrap().as_deref(),
+            Some("/explicit.ghosh")
+        );
+        assert_eq!(
+            service.startup_path().unwrap().as_deref(),
+            Some(snapshot.path.as_str())
+        );
+        assert!(
+            service
+                .close(RevisionRequest {
+                    workspace_id: snapshot.id.clone(),
+                    revision: "stale".into()
+                })
+                .is_err()
+        );
+        assert!(service.snapshot().unwrap().is_some());
+        let job = service
+            .jobs
+            .begin(ghosh_core::operations::JobKind::NodeConnect, false)
+            .unwrap();
+        assert!(
+            service
+                .close(RevisionRequest {
+                    workspace_id: snapshot.id.clone(),
+                    revision: snapshot.revision.clone()
+                })
+                .is_err()
+        );
+        drop(job);
+        service
+            .close(RevisionRequest {
+                workspace_id: snapshot.id.clone(),
+                revision: snapshot.revision.clone(),
+            })
+            .unwrap();
+        assert!(service.snapshot().unwrap().is_none());
+        assert!(service.startup_path().unwrap().is_none());
+        assert_eq!(service.recent().unwrap().len(), 1);
+        let reopened =
+            Workspace::open(Path::new(&snapshot.path), &tmp.path().join("locks")).unwrap();
+        drop(reopened);
+        drop(service);
+        let restored = Services::new(
+            tmp.path().join("data"),
+            Arc::new(DocumentOpenQueue::default()),
+        )
+        .unwrap();
+        assert!(restored.startup_path().unwrap().is_none());
+        restored.forget_recent(None).unwrap();
+        assert!(Path::new(&snapshot.path).exists());
+        assert!(restored.recent().unwrap().is_empty());
+    }
 
     fn approval_fixture() -> (tempfile::TempDir, Services, String) {
         let tmp = tempfile::tempdir().unwrap();
@@ -605,7 +706,7 @@ mod tests {
                 digest: preview.digest,
             })
             .unwrap();
-        assert!(!committed.trusted);
+        assert!(committed.trusted);
         assert_eq!(committed.nodes[0].id, "worker");
         assert_eq!(
             service.operations().unwrap().approvals.requests[0].state,

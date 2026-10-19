@@ -91,7 +91,7 @@ fn preview_is_inert_and_create_update_reopen_preserve_unknown_fields_and_comment
     n.host = "localhost".into();
     n.labels = vec!["web".into()];
     let s = commit(&mut ws, NodeChange::Update { node: n });
-    assert!(!s.trusted);
+    assert!(s.trusted);
     let saved = fs::read_to_string(ws.root().join("nodes/edge1.toml")).unwrap();
     for preserved in ["# my node", "# host note", "custom='keep'", "also keep"] {
         assert!(saved.contains(preserved), "{saved}");

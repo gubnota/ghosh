@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 
 // Browser-only deterministic IPC fixture. This does not exercise native services.
-async function fixture(page: Page, trusted = false, unknown = false) {
+async function fixture(page: Page, trusted = true, unknown = false) {
   await page.route("**/", async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace('<script type="module" src="/src/main.tsx"></script>', `<script type="module">
@@ -15,6 +15,8 @@ async function fixture(page: Page, trusted = false, unknown = false) {
       window.fixtureWorkspace = { id: 'fixture', name: 'Test fleet', path: '/tmp/Test.ghosh', revision: 'r1', schema: 1, read_only: false, trusted: ${trusted}, external_changed: false, notices: [], nodes: [
         {id:'edge1',host:'192.0.2.1',port:22,user:'admin',labels:['web']}, {id:'db1',host:'192.0.2.2',port:22,user:'deploy',labels:['database']}
       ]};
+      window.fixtureSavedWorkspace = structuredClone(window.fixtureWorkspace);
+      window.fixtureRecent = [{name:'Test fleet',path:'/tmp/Test.ghosh'},{name:'Other fleet',path:'/tmp/Other.ghosh'}];
       window.fixtureOperations = { jobs: { sequence: 1, jobs: [{id:'job-1',kind:'workspace_open',state:'succeeded',cancellable:false,started_at:Date.now(),finished_at:Date.now(),error:null,stages:['started','completed']}] }, approvals: { sequence: 1, requests: [], audit: [] } };
       mockIPC(async (cmd, args) => {
         window.fixtureCalls.push(cmd);
@@ -58,11 +60,15 @@ async function fixture(page: Page, trusted = false, unknown = false) {
           const change = args.request.mutation.change;
           window.fixtureWorkspace.nodes = window.fixtureWorkspace.nodes.filter(node => node.id !== (change.node?.id || change.id));
           if (change.kind !== 'remove') window.fixtureWorkspace.nodes.push(change.node);
-          window.fixtureWorkspace.revision += '-nodes'; window.fixtureWorkspace.trusted = false;
+          window.fixtureWorkspace.revision += '-nodes'; window.fixtureWorkspace.trusted = true;
           return structuredClone(window.fixtureWorkspace);
         }
+        if (cmd === 'workspace_startup') return structuredClone(window.fixtureWorkspace);
+        if (cmd === 'workspace_close') {window.fixtureWorkspace = null; return null;}
+        if (cmd === 'workspace_forget_recent') {window.fixtureRecent = args.path ? window.fixtureRecent.filter(entry => entry.path !== args.path) : []; return structuredClone(window.fixtureRecent);}
+        if (cmd === 'workspace_open') {window.fixtureWorkspace = structuredClone(window.fixtureSavedWorkspace); return structuredClone(window.fixtureWorkspace);}
         if (cmd === 'workspace_snapshot') return structuredClone(window.fixtureWorkspace);
-        if (cmd === 'workspace_recent') return [];
+        if (cmd === 'workspace_recent') return structuredClone(window.fixtureRecent);
         if (cmd === 'workspace_pending') return null;
         if (cmd === 'workspace_rename') { window.fixtureWorkspace.name = args.request.name; window.fixtureWorkspace.revision = 'r2'; return structuredClone(window.fixtureWorkspace); }
         if (cmd === 'workspace_reload') { window.fixtureWorkspace.external_changed = false; return structuredClone(window.fixtureWorkspace); }
@@ -154,7 +160,7 @@ test("external-change event retains draft and blocks shortcut save/trust", async
   await page.keyboard.press("Meta+s");
   await expect(page.getByLabel("Workspace name", { exact: true })).toHaveValue("Keep this draft");
   await expect(page.getByRole("button", { name: "Save changes" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Trust workspace", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Pause operations", exact: true })).toBeDisabled();
   expect(await page.evaluate(() => (window as unknown as { fixtureCalls: string[] }).fixtureCalls.filter(x => x === "workspace_rename"))).toEqual([]);
   await page.getByRole("button", { name: "Reload workspace", exact: true }).click();
   await page.keyboard.press("Escape");
@@ -563,4 +569,49 @@ test("small layouts contain text and dropdown menus at normal and 200 percent zo
       }
     }
   }
+});
+
+test("recent workspace command is clickable; history can be removed without closing", async ({ page }) => {
+  await fixture(page);
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("combobox", { name: "Search commands" }).fill("workspace recent");
+  await page.getByRole("option", { name: /Recent workspaces/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Workspaces", exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Find a workspace").fill("Other");
+  await expect(dialog.getByRole("button", { name: "Remove Test fleet from history" })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Remove Other fleet from history" }).click();
+  await expect(dialog).toContainText("No matching workspaces");
+  await dialog.getByLabel("Find a workspace").fill("");
+  await dialog.getByRole("button", { name: "Clear history", exact: true }).click();
+  await expect(dialog).toContainText("No recent workspaces");
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Test fleet", exact: true })).toBeVisible();
+  const calls = await page.evaluate(() => (window as unknown as { fixtureCalls: string[] }).fixtureCalls);
+  expect(calls).toContain("workspace_startup");
+  expect(calls.filter(cmd => cmd === "workspace_forget_recent")).toHaveLength(2);
+  expect(calls).not.toContain("workspace_close");
+});
+
+test("bracket shortcuts wrap tabs; close workspace guards draft then returns to Welcome", async ({ page }) => {
+  await fixture(page);
+  await page.getByLabel("Workspace name", { exact: true }).fill("Unsaved");
+  await command(page, "settings");
+  await page.keyboard.press("Meta+[");
+  await expect(page.getByRole("tab", { name: /^Overview/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Workspace name", { exact: true })).toHaveValue("Unsaved");
+  await page.keyboard.press("Meta+[");
+  await expect(page.getByRole("tab", { name: "Settings", exact: true })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Meta+]");
+  await expect(page.getByRole("tab", { name: /^Overview/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Meta+Shift+w");
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Workspace name", { exact: true })).toHaveValue("Unsaved");
+  await page.keyboard.press("Meta+Shift+w");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Welcome to ghosh." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Test fleet from history" })).toBeVisible();
+  const calls = await page.evaluate(() => (window as unknown as { fixtureCalls: string[] }).fixtureCalls);
+  expect(calls.filter(cmd => cmd === "workspace_close")).toHaveLength(1);
 });

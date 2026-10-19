@@ -55,7 +55,7 @@ fn create_reopen_and_round_trip_unknown_fields_and_comments() {
     );
     let mut ws = f.open();
     let first = ws.snapshot();
-    assert!(!first.trusted);
+    assert!(first.trusted);
     assert_eq!(first.nodes.len(), 0);
     let next = ws
         .rename(
@@ -124,7 +124,7 @@ fn external_edit_conflicts_without_overwrite_then_reload() {
     assert!(f.manifest().contains("External"));
     let fresh = ws.reload(Principal::LocalUi, &s.id, &s.revision).unwrap();
     assert_eq!(fresh.name, "External");
-    assert!(!fresh.trusted);
+    assert!(fresh.trusted);
 }
 #[test]
 fn invalid_external_edit_keeps_last_valid_snapshot_and_recovers() {
@@ -431,20 +431,42 @@ fn existing_target_and_partial_staging_are_not_overwritten_or_opened() {
     );
 }
 #[test]
-fn trust_is_session_only_and_external_changes_invalidate_it() {
+fn local_approval_defaults_on_and_pause_survives_reload() {
     let f = Fixture::new();
     let mut ws = f.open();
     let s = ws.snapshot();
-    assert!(
-        ws.set_trusted(Principal::LocalUi, &s.id, &s.revision, true)
-            .unwrap()
-            .trusted
-    );
+    assert!(s.trusted);
+    ws.set_trusted(Principal::LocalUi, &s.id, &s.revision, false)
+        .unwrap();
     f.replace("Homelab", "External");
+    assert!(ws.snapshot().external_changed);
     assert!(!ws.snapshot().trusted);
+    let fresh = ws.reload(Principal::LocalUi, &s.id, &s.revision).unwrap();
+    assert!(!fresh.trusted);
+    assert!(!fresh.external_changed);
     drop(ws);
-    assert!(!f.open().snapshot().trusted);
+    assert!(f.open().snapshot().trusted);
 }
+#[test]
+fn disk_changes_keep_local_approval_but_still_block_writes() {
+    let f = Fixture::new();
+    let mut ws = f.open();
+    let s = ws.snapshot();
+    f.replace("Homelab", "External");
+    assert!(ws.snapshot().trusted);
+    assert!(ws.snapshot().external_changed);
+    assert!(
+        ws.rename(
+            Principal::LocalUi,
+            &s.id,
+            &s.revision,
+            "Unsafe",
+            &Cancellation::default()
+        )
+        .is_err()
+    );
+}
+
 #[test]
 fn bounded_watcher_observes_external_change_and_stops_on_drop() {
     let f = Fixture::new();

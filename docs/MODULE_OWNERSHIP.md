@@ -11,7 +11,7 @@ Execution services below are future boundaries, not existing modules.
 | ghosh-core/policy | Human edit authorization, secret-service access, mandatory approval set | Core contracts/portable identity |
 | ghosh-core/secrets | Zeroized values, reference validation, SecretStore port | Core policy/contracts; no platform APIs |
 | ghosh-core/workspace | TOML validation/patches, references, leases, revision/atomic persistence, watcher/trust | Core contracts/policy and portable filesystem libraries |
-| src-tauri/services | Active workspace/watch, recent/open queue, jobs and fresh-disk approval decisions | Core; Tauri events; injected queue |
+| src-tauri/services | Active workspace/watch/lifecycle, app-local MRU/restore state, open queue, jobs and fresh-disk reviews | Core; Tauri events; injected queue |
 | src-tauri/commands | Local caller check and typed IPC; offload blocking work | Services/core and native file dialog |
 | ghosh-core/ssh_keys | User-local registry, safe files, key metadata and precedence | Portable filesystem/crypto; injected generator/inspector |
 | ghosh-ssh | Direct SSH handshake, known-host verification/algorithm preference and authentication; no workspace/UI policy | Core SSH DTOs; ssh2/crypto |
@@ -65,7 +65,7 @@ Execution services below are future boundaries, not existing modules.
 - Core tests own persistence/schema/conflict/secret/policy behavior (see TASK_LOG.md for current results).
 - Shell tests own caller restrictions and early/bounded document queue and fresh-disk approval invalidation (see TASK_LOG.md for current results).
 - Native Keychain test is opt-in, creates a temporary item and cleans it up.
-- Browser fixtures own 18 UI/focus/reconciliation journeys; do not claim native effects.
+- Browser fixtures own 20 UI/focus/reconciliation journeys; do not claim native effects.
 - Shared Select owns themed menus, keyboard selection/typeahead and viewport positioning.
 - Platform adapters own legacy-secret availability; Linux fails closed, file keys stay separate.
 - Release tooling owns version guards, native packaging/checksums and sequential tag-only CI.

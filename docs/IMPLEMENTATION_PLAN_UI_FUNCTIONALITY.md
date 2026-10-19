@@ -1,6 +1,10 @@
 # Implementation Plan: Ghosh reference UI and working native functionality
 
 Date: 2026-10-18. Status: **Approved by the user's “go”; implementation in progress.**
+
+Accepted 2026-10-19 supplement: [operational workflows](IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md).
+Default local approval, existing Ansible execution, monitoring and scenes amend or
+extend the policy/scope below; implement sequentially.
 Execution: sequential, one bounded increment at a time; no parallel agents/builds.
 
 Progress: shell/keyboard, jobs/approvals, revisioned node CRUD, file-key library and

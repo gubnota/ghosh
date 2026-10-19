@@ -23,6 +23,8 @@
 - [DECISIONS.md](DECISIONS.md) records choices and their consequences.
 - [TASK_LOG.md](TASK_LOG.md) records real checks and remaining verification gaps.
 - [IMPLEMENTATION_PLAN_M1.md](IMPLEMENTATION_PLAN_M1.md) records approved scope/outcome.
+- [IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md](IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
+  is approved: lifecycle/default approval implemented; SSH/Ansible/timers/monitoring and expanded workflows pending.
 - Full target architecture: ARCHITECTURE.md; sequencing: MILESTONES.md.
 - Target schemas/API: WORKSPACE_SCHEMA.md, SCRIPTING_API.md, MCP_SURFACE.md.
 - User source: ghosh-prompt.md (user-owned, intentionally ignored by Git).
@@ -64,7 +66,7 @@
 - Failed creation cleans its own stage; a crash can leave an inert hidden stage.
 - There is no multi-file recovery journal or automatic crashed-stage cleanup.
 - Native watcher debounces changes; bounded two-second revision probes cover missed events.
-- External edits invalidate trust and block save until validated reload.
+- External edits invalidate execution reviews and block save until validated reload; local approval remains.
 - Failed reload preserves the last valid snapshot and the user's draft.
 - Replaced/moved roots are rejected instead of writing through a stale directory handle.
 - Bounds: 1 MiB/TOML, 1,024 config files, 16 MiB aggregate config.
@@ -87,14 +89,17 @@
 - Native file dialogs choose parent folders and .ghosh document packages.
 - Finder cold/warm document-open requests enter a bounded queue before services initialize.
 - UI subscribes before draining; requests wait while a dialog/operation is active.
-- Recent history stores at most ten paths/names in the app data directory.
+- workspaces.json stores ten recent names/paths and a separate last-open path; migrates recent.json.
+- Startup restores last unless a native document-open request is queued. Close disables restoration.
+- Recent search/remove/clear leave package files intact; Close releases watcher/leases/PTYs.
 - History persistence failure is a notice and does not prevent workspace opening.
 - One active workspace per process; filesystem work runs off the UI thread.
 - Restricted command capabilities, caller/origin validation and CSP protect shell IPC.
 - Remote child views have no privileged IPC grants; none exist in M1.1.
 
 ## Trust, secrets and approval policy
-- Trust is in memory, defaults untrusted and resets on reopen/reload.
+- Local schema 1/2 workspaces default approved; manual Pause survives reload, reopen approves again.
+- Newer schemas remain read-only/unapproved; approval alone never executes contents.
 - Trust alone grants no execution capability; direct authentication has a separate single-use review.
 - Review binds workspace/revision/native session/key-registry revision/exact server key; 120s TTL.
 - Trust, reload and mutations rotate the native session and invalidate reviews/inflight context.

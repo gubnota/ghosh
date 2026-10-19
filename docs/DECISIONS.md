@@ -262,3 +262,25 @@ restrictions and control static import/dependency acquisition explicitly.
 Consequences: Remote executor remains pending; local embedded deno_core is a
 separate planned API. A short-lived compiled helper needs its own concrete use case.
 Related files: README.md, docs/IMPLEMENTATION_PLAN_UI_RELEASE.md.
+
+# ADR-0018: Operational workflow supplement and local approval defaults
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: User reports unusable SSH/scenario flows and requests existing Ansible
+playbooks, default workspace approval, cross-workspace timer catch-up, live
+monitoring, named ComfyUI models, browser sessions and future scene automation.
+The approved plan excludes full Ansible compatibility and retains session trust.
+Decision: Adopt default local workspace approval, operation-scoped authorization,
+managed SSH PTYs/auth, a real controller-side Ansible Runner adapter, enabled
+app-local schedule bindings and sequential usable workflow slices. Initial ComfyUI
+families are MiniMax H3, Wan 2.2, LTX 2.3 and user-imported LoRAs. Keep Telegram at
+integration-design scope. Existing runtime contracts remain until implementation.
+Consequences: User approved this supplement with “go” on 2026-10-19; previous
+approved work remains approved. No production deployment or original-project
+modification is part of diagnosis. RunPod endpoint/paths and LoRA URLs are form
+inputs, not prerequisites for the editor or fabricated example assets.
+Related files: IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md,
+IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md; future changes to approvals/workspace/SSH
+contracts are enumerated in the supplement.

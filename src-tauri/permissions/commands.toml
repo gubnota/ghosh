@@ -1,7 +1,7 @@
 [[permission]]
 identifier = "allow-workspace"
 description = "Manage workspaces from the local main shell."
-commands.allow = ["workspace_open", "workspace_create", "workspace_snapshot", "workspace_rename", "workspace_reload", "workspace_trust", "workspace_pick", "workspace_recent", "workspace_pending"]
+commands.allow = ["workspace_startup", "workspace_close", "workspace_forget_recent", "workspace_open", "workspace_create", "workspace_snapshot", "workspace_rename", "workspace_reload", "workspace_trust", "workspace_pick", "workspace_recent", "workspace_pending"]
 
 [[permission]]
 identifier = "allow-operations"

@@ -28,11 +28,12 @@ impl Workspace {
         let dir = Dir::open_ambient_dir(&root, ambient_authority())?;
         let loaded = storage::load(&dir)?;
         let id_lease = Lease::acquire(lock_dir, &format!("id:{}", loaded.id))?;
+        let trusted = loaded.schema <= 2;
         Ok(Self {
             root,
             dir,
             loaded,
-            trusted: false,
+            trusted,
             _path_lease: path_lease,
             _id_lease: id_lease,
         })
@@ -82,7 +83,7 @@ impl Workspace {
             revision: self.loaded.revision.clone(),
             schema: self.loaded.schema,
             read_only: self.loaded.schema > 2,
-            trusted: self.trusted && !external_changed,
+            trusted: self.trusted,
             external_changed,
             nodes: self
                 .loaded
@@ -176,7 +177,9 @@ impl Workspace {
             }
         }
         self.loaded = fresh;
-        self.trusted = false;
+        if self.loaded.schema > 2 {
+            self.trusted = false;
+        }
         Ok(self.snapshot())
     }
     pub fn set_trusted(

@@ -205,9 +205,7 @@ impl Workspace {
             cancel,
         )?;
         self.loaded = candidate;
-        // Configuration edits always revoke execution trust, even if the caller
-        // only changed labels. Saving metadata does not connect to a node.
-        self.trusted = false;
+        // Native services invalidate execution reviews; local approval is independent.
         Ok(self.snapshot())
     }
 }

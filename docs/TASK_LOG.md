@@ -1,5 +1,18 @@
 # Task log
 
+## 2026-10-19 — Approved operational supplement, lifecycle slice implemented
+
+- User approved the operational supplement with “go”; continue sequentially.
+- Added atomic bounded workspaces.json MRU/last-open state with legacy migration,
+  explicit-open startup priority, native close/release and remove/clear history.
+- Added searchable workspace switcher and palette actions; Cmd+[/] cycles tabs,
+  Cmd+Shift+W closes workspace with draft/session guards; Cmd+W still closes a tab.
+- Schema 1/2 local workspaces default approved, with manual pause retained on reload.
+  Newer schemas remain inert/read-only. Disk conflicts and exact SSH grants remain checked.
+- Verification: 67 Rust tests pass; two opt-in tests skipped. All 20 UI journeys pass
+  (19 in the full run; the corrected dirty-tab locator passed a focused rerun).
+  Strict TypeScript and production build pass. Managed SSH PTY/auth is next.
+
 ## 2026-10-18 — Approved UI/functionality implementation in progress
 
 - User approved the 14-phase plan with “go”; all implementation and verification
@@ -249,3 +262,26 @@
   started successfully for that SHA. Architecture/version, dependency install and
   browser setup pass; macOS common checks are running, Linux waits on macOS.
   This confirms the trigger, not successful remote artifacts or Linux acceptance.
+
+## 2026-10-19 — Operational diagnosis and proposed scope supplement
+
+- Inspected focused node/SSH/terminal/command/workspace paths: the node editor
+  defaults to agent auth while the service rejects it; managed remote PTY and
+  scenario services are absent. Palette click exists, but placeholders are disabled.
+  Restore-last/close/history cleanup and bracket tab shortcuts remain missing.
+- Read server-first-run compact context and selected playbooks read-only. Cataloged
+  seven Ansible entrypoints plus certbot-cloudflare.sh. The shell script forces
+  renewal; certs_sync.yml copies the full Certbot tree with Nginx handler commented
+  out. No production playbooks, credential files or remote mutations executed.
+- Created IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md: concrete files/contracts,
+  eight sequential usable slices, tests/migrations and default local approval
+  proposal. Existing approved plan retained; material supplement approval pending.
+- User clarified ComfyUI examples in Russian: MiniMax H3, Wan 2.2, LTX 2.3 and
+  NSFW LoRAs. Confirmed primary upstream native H3/Wan and publisher LTX integration;
+  plan uses family-specific locked recipes and a user-supplied LoRA asset importer.
+  RunPod connection/path and concrete asset URLs remain recipe form inputs.
+- Updated context/index, README planning link and proposed ADR-0018 without claiming
+  changed runtime behavior. Source/configuration/dependencies and original 1.ghosh
+  workspace remain unchanged. Telegram is design only; no messages sent.
+- Document structure/links/whitespace and request coverage checked. Runtime tests
+  were not repeated for this documentation-only increment.

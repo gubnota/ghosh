@@ -288,3 +288,12 @@ td, th { vertical-align: middle; }
 .detail-line > span { min-width: 0; overflow-wrap: anywhere; }
 .detail-line code { overflow-wrap: anywhere; max-width: 100%; }
 :root[data-layout-tiny] .input-row > button { flex-shrink: 1; }
+
+/* Recent entries retain an independent keyboard-accessible remove action. */
+.recent-workspaces { min-width: 0; }
+.recent-workspaces > input { margin-bottom: 12px; }
+.recent-entry { display: flex; min-width: 0; gap: 4px; align-items: center; }
+.recent-entry .recent-card { flex: 1; width: 0; min-width: 0; }
+.recent-entry .recent-card > span:nth-child(2) { min-width: 0; flex: 1; }
+.recent-entry .recent-card strong, .recent-entry .recent-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-entry > .quiet { flex: 0 0 auto; }
