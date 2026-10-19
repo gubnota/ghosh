@@ -168,6 +168,32 @@ pub fn parse_ansible(source: &str) -> Result<AnsibleProject> {
     }
     Ok(project)
 }
+/// Only recognize the YAML document shape here. Ansible itself owns module,
+/// role, include and Jinja semantics; Ghosh must not invent a parallel schema.
+pub fn standard_playbook(source: &str) -> Option<(String, u32)> {
+    let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(source).ok()?;
+    let plays = value.as_sequence()?;
+    if plays.is_empty() || plays.len() > 256 || plays.iter().any(|p| !p.is_mapping()) {
+        return None;
+    }
+    let name = plays[0]
+        .get("name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("Ansible playbook");
+    let count = plays
+        .iter()
+        .flat_map(|p| {
+            ["pre_tasks", "tasks", "post_tasks"]
+                .map(|k| p.get(k).and_then(|v| v.as_sequence()).map_or(0, Vec::len))
+        })
+        .sum::<usize>();
+    Some((name.chars().take(120).collect(), count as u32))
+}
+pub fn uses_ansible(document: &AutomationDocument) -> bool {
+    document.kind == AutomationKind::Ansible
+        || document.kind == AutomationKind::Playbook
+            && standard_playbook(&document.source).is_some()
+}
 pub fn validate(document: &AutomationDocument) -> AutomationValidation {
     let mut result = AutomationValidation {
         valid: true,
@@ -185,9 +211,13 @@ pub fn validate(document: &AutomationDocument) -> AutomationValidation {
             .push("Use a safe ID and a nonempty UTF-8 document of at most 256 KiB.".into());
     } else {
         match document.kind {
+            AutomationKind::Playbook if standard_playbook(&document.source).is_some() => {
+                let (name, count) = standard_playbook(&document.source).unwrap();
+                result.name = name; result.task_count = count;
+            },
             AutomationKind::Playbook => match parse_playbook(&document.source) {
                 Ok(book) => { result.name = book.name; result.task_count = book.tasks.len() as u32; }
-                Err(_) => result.issues.push("Invalid native YAML. Each task needs name, check.command and shell.command; schema must be 1. Supported optional fields: timeout_s (1–3600), retries (0–5), creates, unless, notify and changed_when (exit_code == 0 or false). Handler names must resolve. Other native action types are not enabled yet.".into()),
+                Err(_) => result.issues.push("Use a standard Ansible YAML list of plays (name, hosts, tasks/roles/import_playbook). Ansible validates modules and Jinja when run. Existing schema: 1 Ghosh scenarios remain supported for compatibility.".into()),
             },
             AutomationKind::Ansible => match parse_ansible(&document.source) {
                 Ok(project) => result.name = project.name,

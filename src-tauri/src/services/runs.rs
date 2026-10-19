@@ -145,7 +145,7 @@ impl Services {
     pub(super) fn run_active(&self) -> Result<bool> {
         Ok(self.runs.lock().map_err(poisoned)?.active.is_some())
     }
-    fn run_document(
+    pub(super) fn run_document(
         &self,
         request: &AutomationReadRequest,
         source: Option<&str>,
@@ -228,7 +228,6 @@ impl Services {
                 .workspace
                 .automation_read(Principal::LocalUi, &request.automation)?;
             if !validate(&document).valid
-                || document.kind == AutomationKind::Ansible
                 || document.kind.is_script() && request.mode != RunMode::Apply
             {
                 return Err(invalid());
@@ -250,7 +249,7 @@ impl Services {
                     )?;
                 }
             }
-            if document.kind == AutomationKind::Playbook {
+            if document.kind == AutomationKind::Playbook && !uses_ansible(&document) {
                 let book = parse_playbook(&document.source)?;
                 if !book.targets.is_empty()
                     && request
@@ -300,6 +299,9 @@ impl Services {
         let spawned = std::thread::Builder::new().name("ghosh-run".into()).spawn(move || {
             let cancel = job.cancellation();
             let outcome: Result<()> = (|| {
+                if uses_ansible(&document) {
+                    return super::ansible::run(&service, &mut request, &document, &mut report, cancel);
+                }
                 let mut prepared = vec![];
                 // Consume all short-lived handshake tickets before long tasks begin.
                 for target in request.targets.iter_mut() {
@@ -329,12 +331,16 @@ impl Services {
                 }
                 Ok(())
             })();
+            if let Err(error) = &outcome {
+                let _ = append(&service, &mut report, TaskResult { node_id: "@controller".into(), name: "Execution error".into(), phase: "controller".into(), state: if error.code == ErrorCode::Cancelled { TaskState::Stopped } else { TaskState::Failed }, output: error.message.clone(), exit_code: None, truncated: false }, &request.input);
+            }
             report.state = if report.results.iter().any(|r| r.state == TaskState::OutcomeUnknown) { RunState::OutcomeUnknown }
                 else if outcome.as_ref().err().is_some_and(|e| e.code == ErrorCode::Cancelled) { RunState::Stopped }
                 else if outcome.is_err() || report.results.iter().any(|r| r.state == TaskState::Failed) { RunState::Failed }
                 else { RunState::Succeeded };
             report.finished_at = Some(now());
             report.message = match report.state {
+                RunState::Succeeded if uses_ansible(&document) => "Ansible finished. Check reports predicted changes; validation and handlers follow the original playbook.",
                 RunState::Succeeded => "Finished. Check results may include drift; Apply verifies every changed task.",
                 RunState::Stopped => "Stopped before the next invocation. Completed changes remain applied.",
                 RunState::OutcomeUnknown => "A command was interrupted, timed out or lost its connection. Inspect affected targets before retrying. No rollback is implied.",
@@ -358,7 +364,7 @@ impl Services {
         Ok(initial)
     }
 }
-fn append(
+pub(super) fn append(
     service: &Services,
     report: &mut RunReport,
     mut value: TaskResult,
@@ -451,6 +457,7 @@ mod tests {
                     connection: None,
                 }],
                 input: "{}".into(),
+                controller_python: None,
             },
         )
     }
@@ -505,7 +512,8 @@ mod tests {
                         node_id: "@local".into(),
                         connection: None
                     }],
-                    input: "{}".into()
+                    input: "{}".into(),
+                    controller_python: None,
                 })
                 .is_err()
         );
@@ -515,6 +523,136 @@ mod tests {
         assert_eq!(
             load(&service, &crashed.id).unwrap().state,
             RunState::OutcomeUnknown
+        );
+    }
+    #[test]
+    #[ignore = "requires GHOSH_CONTROLLER_PYTHON pinned controller"]
+    fn upstream_ansible_check_apply_include_no_log_failure_and_stop() {
+        let python = std::env::var("GHOSH_CONTROLLER_PYTHON").unwrap();
+        let files = tempfile::tempdir().unwrap();
+        let target = files.path().join("target");
+        let source = format!(
+            "- name: Upstream\n  hosts: all\n  gather_facts: false\n  tasks:\n    - name: Ensure directory\n      ansible.builtin.file:\n        path: {}\n        state: directory\n        mode: '0700'\n    - name: Hidden\n      ansible.builtin.debug:\n        msg: NEVER_STORE_THIS\n      no_log: true\n    - ansible.builtin.include_tasks: included.yml\n",
+            serde_json::to_string(&target).unwrap()
+        );
+        let (_tmp, service, request) = fixture(&source, AutomationKind::Playbook);
+        let workspace_root = service
+            .active
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .workspace
+            .root()
+            .to_owned();
+        // Dependencies are kept beside the source and interpreted by upstream.
+        fs::write(
+            workspace_root.join("playbooks/included.yml"),
+            "- name: Included task\n  ansible.builtin.debug:\n    msg: INCLUDED_OK\n",
+        )
+        .unwrap();
+        // Include files participate in the workspace revision; reload before run.
+        service.reload(request.automation.context.clone()).unwrap();
+        let snapshot = service.snapshot().unwrap().unwrap();
+        let mut automation = request.automation;
+        automation.context.revision = snapshot.revision;
+        let make = |mode| RunRequest {
+            automation: automation.clone(),
+            mode,
+            targets: vec![RunTarget {
+                node_id: "@local".into(),
+                connection: None,
+            }],
+            input: "{}".into(),
+            controller_python: Some(python.clone()),
+        };
+        let first = service.run_start(make(RunMode::Check)).unwrap();
+        let check = wait(&service, &first.id);
+        assert_eq!(check.state, RunState::Succeeded, "{check:?}");
+        assert!(check.results.iter().any(|r| r.state == TaskState::Drift));
+        assert!(!target.exists());
+        let first = service.run_start(make(RunMode::Apply)).unwrap();
+        let apply = wait(&service, &first.id);
+        assert_eq!(apply.state, RunState::Succeeded, "{apply:?}");
+        assert!(target.is_dir());
+        assert!(
+            apply
+                .results
+                .iter()
+                .any(|r| r.output.contains("INCLUDED_OK"))
+        );
+        assert!(
+            !serde_json::to_string(&apply)
+                .unwrap()
+                .contains("NEVER_STORE_THIS")
+        );
+        let first = service.run_start(make(RunMode::Apply)).unwrap();
+        let repeat = wait(&service, &first.id);
+        assert_eq!(repeat.state, RunState::Succeeded);
+        assert!(!repeat.results.iter().any(|r| r.state == TaskState::Changed));
+        assert!(!fs::read_dir(&service.data_dir).unwrap().any(|p| {
+            p.unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with("runner-")
+        }));
+        let (_tmp2, failed_service, mut failed) = fixture(
+            "- hosts: all\n  gather_facts: false\n  tasks:\n    - ansible.builtin.fail:\n        msg: EXPECTED_FAILURE\n",
+            AutomationKind::Playbook,
+        );
+        failed.controller_python = Some(python.clone());
+        let first = failed_service.run_start(failed).unwrap();
+        assert_eq!(wait(&failed_service, &first.id).state, RunState::Failed);
+        let (_tmp3, stopped_service, mut stop) = fixture(
+            "- hosts: all\n  gather_facts: false\n  tasks:\n    - ansible.builtin.command: sleep 30\n",
+            AutomationKind::Playbook,
+        );
+        stop.controller_python = Some(python.clone());
+        let first = stopped_service.run_start(stop).unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+        stopped_service.run_stop(first.id.clone()).unwrap();
+        let report = wait(&stopped_service, &first.id);
+        assert!(
+            matches!(report.state, RunState::OutcomeUnknown | RunState::Stopped),
+            "{report:?}"
+        );
+        // A real external project retains its inventory groups, group_vars,
+        // roles and handlers. Nothing is translated into the legacy schema.
+        let project = tempfile::tempdir().unwrap();
+        fs::create_dir_all(project.path().join("group_vars")).unwrap();
+        fs::create_dir_all(project.path().join("roles/example/tasks")).unwrap();
+        fs::write(
+            project.path().join("hosts.ini"),
+            "[test_group]\nlocalhost\n",
+        )
+        .unwrap();
+        fs::write(
+            project.path().join("group_vars/test_group.yml"),
+            "project_fact: EXTERNAL_PROJECT_OK\n",
+        )
+        .unwrap();
+        fs::write(project.path().join("roles/example/tasks/main.yml"), "- name: Original role\n  ansible.builtin.debug:\n    msg: '{{ project_fact }}'\n  changed_when: true\n  notify: original handler\n").unwrap();
+        fs::write(project.path().join("main.yml"), "- hosts: test_group\n  gather_facts: false\n  roles: [example]\n  handlers:\n    - name: original handler\n      ansible.builtin.debug:\n        msg: HANDLER_OK\n").unwrap();
+        let link = format!(
+            "schema: 1\nname: Linked project\nproject: {}\nplaybook: main.yml\ninventory: hosts.ini\n",
+            serde_json::to_string(project.path()).unwrap()
+        );
+        let (_tmp4, linked_service, mut linked) = fixture(&link, AutomationKind::Ansible);
+        linked.controller_python = Some(python);
+        let first = linked_service.run_start(linked).unwrap();
+        let report = wait(&linked_service, &first.id);
+        assert_eq!(report.state, RunState::Succeeded, "{report:?}");
+        assert!(
+            report
+                .results
+                .iter()
+                .any(|r| r.output.contains("EXTERNAL_PROJECT_OK"))
+        );
+        assert!(
+            report
+                .results
+                .iter()
+                .any(|r| r.output.contains("HANDLER_OK"))
         );
     }
     #[test]
@@ -542,6 +680,7 @@ mod tests {
                 connection: None,
             }],
             input: "{}".into(),
+            controller_python: None,
         };
         let check = service.run_start(make_request(RunMode::Check)).unwrap();
         let check = wait(&service, &check.id);

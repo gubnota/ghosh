@@ -357,3 +357,38 @@ Decision: Comment out the complete Linux job; keep tag-only macOS arm64 CI enabl
 Consequences: No Linux artifacts are promised. Preserve the job and local packaging
 support for later diagnosis and re-enablement; do not conceal the failed checks.
 Related files: .github/workflows/ci.yml, README.md, docs/FEATURE_STATUS.md.
+
+
+# ADR-0023: Reuse upstream Ansible and retain simple checked scripts
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: Existing server-first-run projects must retain normal Ansible YAML,
+roles and inventory. The user also wants small scripts with success checks.
+Decision: Standard play lists and project links execute through ansible-core
+2.20.10 / ansible-runner 2.4.3 in an explicitly selected local Python environment.
+Keep simple schema: 1 check/apply/verify scenarios as a separate lightweight option.
+ComfyUI forms generate reviewable standard Ansible, with pinned Git commits and
+SHA-256 model downloads. Reuse existing native authentication and exact server pins.
+Consequences: No new Ansible dialect, persistent server daemon or runtime auto-install.
+Invocation is sequential per selected node, not a full multi-host Ansible batch.
+Linked inventory aliases must match node IDs; original external source is not frozen.
+Private Runner files are temporary, no_log results are censored, bounded reports
+can be exported as JSON. GPU-template acceptance and richer result bindings remain.
+Supersedes ADR-0021’s temporary statement that Ansible is disabled.
+Related files: requirements-controller.txt, src-tauri/src/services/ansible.rs,
+src-tauri/src/services/ansible_bridge.py, src/features/comfy/playbook.ts,
+src/features/automation/examples.ts.
+
+# ADR-0024: Physical RU/EN shortcuts
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: The user clarified Keyboard layout means hotkeys work in RU and EN.
+Decision: Normalize physical event.code for letters, digits and bracket shortcuts;
+retain event.key fallback, composition/Alt guards and terminal Ctrl input ownership.
+Consequences: No shortcut remapping UI is introduced. Existing Cmd shortcuts keep
+working on a Russian layout; keyboard-only fixtures cover both views and terminals.
+Related files: src/app/keyboard.ts, src/app/App.tsx, tests/ui/shell.spec.ts.

@@ -14,7 +14,9 @@
 - Real local PTY/emulator and manual SSH to both authorized targets pass native smoke.
 - Managed direct SSH authentication and PTYs connect immediately; native exact-key checks remain.
 - File keys, encrypted keys and SSH agent passed live tests; per-call password is implemented.
-- Native Playbook/Script local/SSH runs work; Ansible, browsers and MCP execution remain pending.
+- Simple checked scenarios, Shell/Python/Deno and upstream Ansible run locally/over SSH.
+- ComfyUI wizard generates standard Ansible for pinned plugins and checksum-verified models.
+- Browser sessions, monitoring, durable schedules and MCP execution remain pending.
 
 ## Read first and navigate
 - Six memory files summarize actual behavior; keep them short and current.
@@ -25,7 +27,7 @@
 - [TASK_LOG.md](TASK_LOG.md) records real checks and remaining verification gaps.
 - [IMPLEMENTATION_PLAN_M1.md](IMPLEMENTATION_PLAN_M1.md) records approved scope/outcome.
 - [IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md](IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
-  is approved: lifecycle/default approval and direct SSH PTYs implemented; Ansible/timers/monitoring and expanded workflows pending.
+  is approved: lifecycle/default approval, direct SSH PTYs and Ansible implemented; timers/monitoring and expanded workflows pending.
 - Full target architecture: ARCHITECTURE.md; sequencing: MILESTONES.md.
 - Target schemas/API: WORKSPACE_SCHEMA.md, SCRIPTING_API.md, MCP_SURFACE.md.
 - User source: ghosh-prompt.md (user-owned, intentionally ignored by Git).
@@ -76,7 +78,8 @@
 
 ## UI and native shell
 - English Nightfly monospace shell, navigation, stable tabs, command popup and settings.
-- Cmd+K/Cmd+Shift+P, Cmd+1–9 displayed tabs, guarded Cmd+W, scoped search/save and modal focus work.
+- Physical-key shortcuts work in RU/EN: Cmd+K/Shift+P, 1–9, brackets, guarded W, search/save.
+- Composition/Alt guards remain; terminal Ctrl shortcuts reach the real PTY.
 - Shared themed selectors: taller rows, padded SVG arrows, keyboard/typeahead, viewport bounds.
 - Lucide SVG controls, SVG Shift and aligned mixed-state node selection replace glyphs.
 - Native background and shrinkable dark layout prevent white/uncontained page backgrounds.
@@ -102,10 +105,18 @@
 - Playbooks/Scripts catalogs support create, paste, examples, edit, validate, save and recoverable remove.
 - Flat YAML/Ansible links and Shell/Python/Deno sources are revision-bound, at most 256 KiB each.
 - Invalid external sources open inert with validation issues; they cannot be saved through the editor.
-- Native YAML currently supports check/shell tasks and bounded handler references only.
+- Simple schema: 1 scenarios support check/shell/verify and bounded handlers, without Ansible.
+- Standard Ansible YAML is interpreted by upstream ansible-core 2.20.10 / Runner 2.4.3.
+- Controller uses an explicitly selected Python 3.12+ virtualenv, requirements-controller.txt.
+- Linked projects retain inventory/group_vars/roles/includes/handlers in their original folder.
+- Each selected node runs separately, with an exact host-key pin and private transient Runner data.
+- Linked inventory alias must match node ID; full cross-host batch semantics are not implemented.
+- External linked project contents are not frozen by the workspace revision.
+- ComfyUI needs an existing installation, public URLs, Git commits and SHA-256 hashes.
+- GPU acceptance, paid Pod provisioning, service restarts and model catalog are pending.
 - Native Check/Apply/verify, handler/retry/skip rules, up to eight local/SSH targets and Stop work.
 - Shell/Python/Deno execute on installed runtimes; no runtime/dependency installation.
-- Durable bounded Runs update at phase completion; unknown outcomes never replay automatically.
+- Durable bounded Runs update at task/phase completion and export JSON; unknown outcomes never replay automatically.
 
 ## Trust, secrets and approval policy
 - Local schema 1/2 workspaces default approved; manual Pause survives reload, reopen approves again.
@@ -173,12 +184,13 @@
 - Approve a concrete plan before the next software increment; avoid future scaffolding.
 - Keep small coherent changes; preserve user-owned prompt and .gitignore entries.
 - User requested sequential work: no parallel agents or builds for this increment.
-- Latest checks: formatting/Clippy, 67 Rust tests (2 opt-in tests skipped), 22 browser UI tests, contract freshness.
+- Latest checks: formatting/Clippy, 81 Rust tests (3 opt-in skipped), 28 browser UI tests, contract freshness.
+- Separate upstream controller integration and read-only Ansible over SSH passed on both authorized nodes.
 - Arm64 release built; native local/Debian/node3 TTY tests pass, screenshots in README.
 - Browser IPC fixtures verify presentation; they do not prove native execution.
 - Optional native Keychain create/read/delete test passed outside the restricted sandbox.
 - Native smoke passed: create/save/conflict/reload/trust/restart and cold/warm document open.
 - Native Nightfly/keyboard/draft/conflict smoke passed at 1160×780 on macOS 27.
 - Native 200% shell captured; minimum macOS 14 and broad terminal layout matrix pending.
-- Tag-only CI triggered for v0.1.1; final artifact status needs inspection. Signing/notarization are not configured.
+- Tag-only macOS CI remains enabled; Linux job stays commented out. Signing/notarization are not configured.
 - Update memory/contracts/task evidence whenever behavior or scope changes.

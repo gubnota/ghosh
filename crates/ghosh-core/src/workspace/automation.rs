@@ -71,6 +71,19 @@ fn source_id(path: &str, kind: AutomationKind) -> Option<String> {
     entity_id(id).then(|| id.to_owned())
 }
 impl Workspace {
+    /// Native adapter location, never exposed as a generic filesystem IPC.
+    pub fn automation_location(
+        &self,
+        request: &AutomationReadRequest,
+    ) -> Result<std::path::PathBuf> {
+        let files = self.automation_files(Principal::LocalUi, &request.context)?;
+        let (_, _, path) = files
+            .iter()
+            .find(|(id, kind, _)| id == &request.id && kind == &request.kind)
+            .ok_or_else(invalid)?;
+        storage::safe_path(&self.dir, path)?;
+        Ok(self.root().join(path))
+    }
     fn automation_files(
         &self,
         principal: Principal,

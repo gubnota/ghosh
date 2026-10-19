@@ -107,6 +107,28 @@ pub fn agent_identity(socket: PathBuf, cancel: &Cancellation) -> Result<PublicKe
     })
 }
 
+/// Export only the already selected public agent identity for OpenSSH IdentitiesOnly.
+pub fn agent_public_record(
+    socket: PathBuf,
+    reviewed: PublicKeyMetadata,
+    cancel: &Cancellation,
+) -> Result<String> {
+    agent_work(cancel, move || {
+        let session = Session::new().map_err(|_| failed())?;
+        let agent = agent(&session, &socket)?;
+        let keys = agent.identities().map_err(|_| failed())?;
+        let key = keys
+            .iter()
+            .find(|key| public_key(key.blob()).is_ok_and(|p| p == reviewed))
+            .ok_or_else(|| AppError::new(ErrorCode::KeyUnavailable))?;
+        Ok(format!(
+            "{} {}\n",
+            reviewed.algorithm,
+            STANDARD_NO_PAD.encode(key.blob())
+        ))
+    })
+}
+
 pub struct Endpoint {
     pub host: String,
     pub port: u16,
@@ -117,6 +139,21 @@ pub struct Endpoint {
 pub struct HostRecord {
     key: Vec<u8>,
     pub preview: HostKeyPreview,
+}
+impl HostRecord {
+    /// Exact handshake pin for a private per-run OpenSSH known_hosts file.
+    pub fn openssh_record(&self, host: &str, port: u16) -> String {
+        let host = if port == 22 {
+            host.to_owned()
+        } else {
+            format!("[{host}]:{port}")
+        };
+        format!(
+            "{host} {} {}\n",
+            self.preview.algorithm,
+            STANDARD_NO_PAD.encode(&self.key)
+        )
+    }
 }
 pub struct Connection {
     session: Session,

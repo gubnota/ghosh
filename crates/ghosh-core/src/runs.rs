@@ -48,6 +48,9 @@ pub struct RunRequest {
     pub targets: Vec<RunTarget>,
     // Non-secret JSON inputs, passed as GHOSH_INPUT. Never persisted in the report.
     pub input: String,
+    // Absolute Python from the user's Ansible controller environment.
+    #[serde(default)]
+    pub controller_python: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct TaskResult {

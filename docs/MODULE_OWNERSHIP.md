@@ -1,7 +1,8 @@
 # Module ownership
 
-Status: workspace/node/key persistence, Nightfly shell, jobs/approvals and reviewed local/SSH PTYs implemented.
-Execution services below are future boundaries, not existing modules.
+Status: workspace/node/key persistence, Nightfly shell, jobs/approvals, local/SSH PTYs,
+simple checked scenarios, scripts and upstream Ansible execution are implemented.
+Future services remain explicitly listed below.
 
 ## Implemented ownership
 | Owner | Responsibility | Allowed dependencies |
@@ -39,7 +40,7 @@ Execution services below are future boundaries, not existing modules.
 - Keep peer adapters acyclic; cross-service work uses injected core ports/handles.
 
 ## Future ownership
-- Extend ghosh-ssh: jumps/pool/exec/SFTP and persistent host enrollment; core/route ports.
+- Extend ghosh-ssh: jumps/pool/SFTP and persistent host enrollment; core/route ports.
 - Existing file-key registry/adapter stays separate from Keychain-only SecretStore.
   Per-call encrypted-key unlock works; there is no persisted unlock cache.
 
@@ -65,7 +66,7 @@ Execution services below are future boundaries, not existing modules.
 - Core tests own persistence/schema/conflict/secret/policy behavior (see TASK_LOG.md for current results).
 - Shell tests own caller restrictions and early/bounded document queue and fresh-disk approval invalidation (see TASK_LOG.md for current results).
 - Native Keychain test is opt-in, creates a temporary item and cleans it up.
-- Browser fixtures own 25 UI/focus/reconciliation journeys; do not claim native effects.
+- Browser fixtures own 28 UI/focus/reconciliation journeys; do not claim native effects.
 - Shared Select owns themed menus, keyboard selection/typeahead and viewport positioning.
 - Platform adapters own legacy-secret availability; Linux fails closed, file keys stay separate.
 - Release tooling owns version guards, native packaging/checksums and tag-only CI.
@@ -82,5 +83,9 @@ Execution services below are future boundaries, not existing modules.
 - Native runs owns worker/target validation, revision checks, private reports and cancellation.
 - Local adapter owns process groups/pipes; SSH adapter owns non-PTY channels and uncertain disconnect outcomes.
 - Frontend owns target/input/credential presentation and phase report polling; no direct process or key access.
-- Ansible Runner remains a separate controller adapter, not native YAML translation.
+- Native ansible.rs owns reviewed identities and process/report integration; ansible_bridge.py delegates all Ansible semantics to pinned upstream Runner.
+- Simple schema: 1 check/apply/verify stays in core runs; standard Ansible is never translated into that format.
+- ComfyUI frontend owns reviewable standard YAML generation; shared Run services execute it.
+- Controller integration tests own real module/idempotence/no_log/include/role/inventory/handler/cancel acceptance.
+- GPU/template compatibility and live agent/password Runner acceptance remain separate gates.
 - SSH UI auto-consumes native tickets without human confirmation; transport owns key pinning and changed-host rejection.

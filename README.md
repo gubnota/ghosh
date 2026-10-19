@@ -8,18 +8,20 @@ a compact monospace layout, commands and keyboard-operated review dialogs.
 SSH key library, identity migration, jobs, approval infrastructure and real local
 PTY terminals, direct managed SSH terminals and Playbook/Script authoring and execution are working.
 The approved [implementation plan](docs/IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md)
-is in progress. Native check/apply scenarios and Shell/Python/Deno scripts run locally or over SSH. Ansible and the other service screens are still being implemented. Unavailable actions explain
-their status; prototype screenshots are never presented as working native features.
+is in progress. Simple checked scenarios, Shell/Python/Deno scripts and standard
+Ansible run locally or over SSH. ComfyUI recipes generate normal Ansible YAML for
+existing GPU nodes. Browser sessions, monitoring, timers and certificate orchestration
+remain in progress; see the limitations below.
 
 The approved [operational workflow supplement](docs/IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
 addresses the reported SSH/workspace gaps, existing Ansible playbooks, certificate
 timers, live monitoring and ComfyUI recipes (MiniMax H3, Wan 2.2, LTX 2.3, LoRA imports).
 Workspace restoration, cleanable history and local approval defaults are implemented.
-The remaining workflow sections describe planned work. See the current [feature checklist](docs/FEATURE_STATUS.md).
+The feature checklist separates delivered behavior from remaining work. See the current [feature checklist](docs/FEATURE_STATUS.md).
 
 ## Screenshots
 
-These are actual native app captures, not Base44 mockups. Screenshots show public
+Captures 01–31 below are actual native app captures, not Base44 mockups. Screenshots show public
 metadata for a disposable identity or an explicitly selected existing key; no private
 key material is shown.
 
@@ -54,6 +56,14 @@ key material is shown.
 ![Keyboard command popup](docs/evidence/ui-shell/04-command-popup.jpg)
 
 ![Reviewing a node’s inherited file identity](docs/evidence/ui-shell/14-node-file-identity-review.jpg)
+
+New authoring screens below are **browser presentation captures with explicit IPC
+fixtures**, not evidence of a GPU installation or native Ansible execution. Actual
+Ansible and SSH acceptance is recorded under Checks.
+
+![ComfyUI recipe wizard: existing paths, model family and pinned plugin/model inputs](docs/evidence/ui-shell/34-comfy-wizard-fixture.png)
+
+![Bounded report with JSON export, browser fixture](docs/evidence/ui-shell/32-ansible-results-fixture.png)
 
 More native captures are in [UI evidence](docs/evidence/ui-shell/README.md).
 The separate [Base44 reference inventory](docs/base44/reference-app/INTERACTION_INVENTORY.md)
@@ -127,7 +137,8 @@ legacy `recent.json` is migrated automatically.
    **Cmd+1–9** selects the corresponding displayed tab; absent positions do nothing.
    **Cmd+[ / Cmd+]** cycles tabs. **Cmd+Shift+W** closes the workspace, preserving
    its files and asking about drafts or active terminals. **Cmd+Q** keeps normal quit behavior.
-   **Cmd+Shift+E** focuses the selected navigation item. Settings controls font,
+   **All app shortcuts work with RU and EN layouts using physical keys.**
+   Composition and terminal Ctrl input remain protected. **Cmd+Shift+E** focuses the selected navigation item. Settings controls font,
    density and zoom; preferences survive restart.
 
 All selectors use themed menus with taller rows and inset arrows. Tab focuses a
@@ -149,12 +160,13 @@ the connection dialog asks for the passphrase without saving it. Never put priva
 | Reuse SSH identities across workspaces | Existing system files, custom references/copies, Ed25519 generation, defaults and relinking |
 | Verify access before operating on a node | Direct SSH Test/Terminal without a confirmation step; file keys, SSH agent or a per-connection password |
 | Operate entirely from the keyboard | Command popup, navigation, tabs, scoped search/save and modal review |
-| Inspect local workspace work and authorizations | Real jobs, approval inbox and revocable native grants; execution integration pending |
+| Inspect local workspace work and authorizations | Real jobs, approval inbox and native execution checks |
 | Troubleshoot locally or on a remote node | Real local and managed SSH PTYs, xterm emulator, split/search and optional manual system SSH |
 | Author a scenario or script | Playbooks/Scripts: New, paste source, examples, edit, validate, save and recoverable remove; YAML, Shell, Python and Deno |
 | Run native scenarios and scripts | Select up to eight local/SSH targets; Check/Apply/verify, handlers, Stop and persistent per-node results |
-| Run the existing Ansible project | Inert project links can be saved; real Ansible Runner execution remains pending |
-| Manage browser profiles, routes, certificates or ComfyUI | Planned native services; current placeholder screens do not execute operations |
+| Run the existing Ansible project | Real upstream Runner, original project roles/inventory/variables and Check/Apply |
+| Install ComfyUI plugins and download models | Recipe wizard generates standard Ansible with pinned commits/checksums; actual GPU acceptance pending |
+| Manage browser profiles, routes or certificates | Planned native services; these placeholder screens do not execute operations |
 | Give an agent controlled MCP access | Planned, disabled by default; no running MCP server yet |
 
 The authorized integration targets are `debian.orb.local` (OrbStack Linux ARM64)
@@ -182,63 +194,149 @@ gates are in [the task log](docs/TASK_LOG.md).
 
 ## Create scenarios and scripts
 
-Open **Playbooks**, or run `playbook new` from Cmd+K. Choose **Use example** for
-read-only Linux facts, an idempotent temporary directory, or a link to the existing
-server-first-run Ansible project. Give it a safe ID, edit the YAML, choose
-**Validate**, then **Save**. **Import source** lets you paste a document into the
-same editor. **Edit** reopens the exact saved text, including comments. External
-changes require workspace reload before another save. **Remove** retains a
-recoverable `.removed` file in the same folder.
+Open **Playbooks**, or run `playbook new` from Cmd+K. Choose an example, give it a
+safe ID, edit the source, **Validate**, then **Save**. **Import source** accepts pasted
+source. **Edit** reopens exact saved text, including comments. External edits require
+reload; **Remove** retains a recoverable `.removed` file. Opening, validating or saving
+never executes source. Files live in the configured `playbooks/` and `scripts/` folders.
 
-**Scripts** / `script new` provides Shell, Python and Deno examples. Deno is a useful
-optional runtime for JavaScript/TypeScript on nodes; no precompiled server agent is
-required. It is not installed automatically. Script validation currently checks
-source bounds rather than interpreter syntax. Native YAML validation checks the
-supported task structure; Ansible links validate paths without reading or copying
-project files. These operations do not execute code.
+For small tasks, choose **Simple script with success check**. It needs no Ansible:
 
-Sources live in the configured `playbooks/` and `scripts/` folders and participate
-in workspace revision/conflict detection. Saving never executes a source.
+```yaml
+schema: 1
+name: Simple script with success check
+tasks:
+  - name: Create and verify example directory
+    check:
+      command: test -d /tmp/ghosh-checked-example || exit 10
+    shell:
+      command: mkdir -p /tmp/ghosh-checked-example
+    timeout_s: 30
+```
+
+**Check** reports exit 0 as satisfied and exit 10 as drift. Other exits fail.
+**Apply** checks first, runs the script only for drift, then repeats the check to
+verify success. This example is idempotent. Use a read-only check that actually
+verifies the result you need. Explicit retries, `creates`/`unless`, `changed_when`
+and named deduplicated handlers are also supported.
+
+For larger workflows, use **standard Ansible YAML** or **Existing Ansible project**.
+Ansible owns its modules, roles, handlers, includes, templates and Check semantics;
+Ghosh does not translate it into the simple format. Inert validation checks the YAML
+play-list shape; upstream Ansible performs full execution validation.
+
+**Scripts** / `script new` offers Shell, Python and Deno examples. Validation checks
+source bounds, not interpreter syntax. The installed runtime executes on each target;
+exit 0 means success and a nonzero exit means failure. Use `set -eu` in shell scripts
+or raise an exception/exit nonzero in Python/JavaScript when a result is invalid.
+Optional non-secret JSON inputs arrive as `GHOSH_INPUT`. Use the checked-scenario
+format above when you need a separate post-execution verification step.
+
+## Set up the Ansible controller
+
+Only Ansible workflows need this optional controller on the Mac. Simple checked
+scenarios and standalone scripts run without it. Install Python 3.12+ and create a
+virtual environment once (replace `python3.12` with your installed newer Python):
+
+```sh
+python3.12 -m venv ~/.local/share/ghosh/controller
+~/.local/share/ghosh/controller/bin/python -m pip install -r requirements-controller.txt
+```
+
+The pinned versions are `ansible-core==2.20.10` and `ansible-runner==2.4.3`.
+In the Run dialog, enter the absolute path to that environment's `bin/python`;
+the app remembers this path on this machine. No PATH guessing, automatic package
+installation or persistent Ghosh server agent is needed. Install project-specific
+collections and dependencies into this controller separately. Nodes still need the
+normal runtimes required by their Ansible modules.
+
+To reuse a project, select the link example and edit this **link metadata**; the
+linked playbook itself remains ordinary Ansible YAML:
+
+```yaml
+schema: 1
+name: Existing infrastructure project
+project: /absolute/path/to/server-first-run
+playbook: ssh_playbook.yml
+inventory: hosts.ini
+```
+
+The project stays in place, including inventory, group_vars, roles, includes and
+handlers; credentials are not copied into the workspace. Keep its private files in
+that project. Use another saved link for each entrypoint you need. Merely opening or
+validating a link does not read its external contents.
+
+Currently each selected node gets a **separate upstream invocation** with `forks=1`
+and an inventory limit. Its inventory alias must equal its Ghosh node ID; local
+execution uses `localhost`. Plays must match that alias or its inventory groups.
+This does not reproduce all multi-host `run_once`, delegation or cross-host ordering
+semantics. Original external files are read at run time and are not frozen by the
+workspace revision. Review project inventory/configuration accordingly. Complete
+server-first-run certificate renewal/distribution and timer acceptance remain pending.
 
 ## Run and inspect results
 
-1. Open **Playbooks**, save **Inspect Linux node**, then choose **Run**. Select
-   **Check** and your Debian/node3 nodes (or **Local machine**); choose **Start check**.
-2. **Check** runs each declared check command: exit 0 means satisfied, exit 10
-   means drift; another exit fails that node. Check commands are executable code,
-   so use read-only commands when that is the intended behavior.
-3. **Apply** checks immediately before each change, runs the shell command only
-   for drift, then checks again. Failed verification stops the node. Explicit
-   retries recheck state; interrupted commands are never retried automatically.
-   `creates`/`unless`, `changed_when` and deduplicated successful-node handlers work.
-   A nonempty YAML `targets` list limits the node IDs selectable for execution.
-4. In **Scripts**, choose **Run** to execute Shell, Python 3 or Deno. The runtime
-   must already exist on the target; missing Python/Deno produces a run result.
-   Deno reports its version and runs without prompts, project config, lock writes
-   or dependency downloads, with only GHOSH_INPUT environment and hostname access.
-   Network/file/subprocess permissions and installation recipes are future work.
-5. Optional non-secret JSON object inputs arrive as the `GHOSH_INPUT` environment
-   variable. There are no result bindings, artifacts or secret-input broker yet.
-6. **Runs** shows saved phases, exit codes, bounded output and **Stop run**.
-   Targets execute sequentially; only one automation run is active. Cmd+K `run plan`
-   or `run apply` opens the first runnable native playbook's target form.
+1. Save a simple scenario or Ansible playbook, then **Run**, select up to eight
+   targets and **Check** or **Apply**. Fill the controller Python path for Ansible;
+   leave it empty for simple scenarios. **Inspect Linux node** is a standard Ansible
+   read-only example for Debian/node3; **Create a temporary directory** uses its file module.
+2. Standard Ansible Check uses `--check`; modules/tasks can still run when their own
+   check-mode rules allow it. Apply uses normal module idempotence and changed/failed
+   results. Simple scenarios instead use the check/script/verify contract above.
+3. Scripts support **Execute script**. Shell/Python/Deno must already exist on the
+   selected target. Deno reports its version and runs without prompts, project config,
+   lock writes or dependency downloads, with only GHOSH_INPUT and hostname access.
+   Configurable network/file/subprocess permissions remain future work.
+4. Optional non-secret JSON object inputs become Ansible extra variables or the
+   `GHOSH_INPUT` environment variable. Connection/inventory override variables are
+   rejected. Result bindings, arbitrary artifacts and secret-input broker remain pending.
+5. **Runs** shows persistent task/phase results, exit status, bounded output and
+   **Stop run**. **Export results · JSON** saves the stored report. Targets execute
+   sequentially and only one automation run is active. Cmd+K `run plan` / `run apply`
+   opens the first runnable playbook's target form.
 
-SSH connections start without approval dialogs. Only a necessary password or key
-passphrase prompts, and neither is saved. Existing changed host keys still fail.
-Workspace edits/switch/close are blocked during execution; externally edited
-source is rejected before the next invocation. Stop reaps local process groups;
-remote stop, timeout or transport loss means **Outcome unknown** because closing
-an SSH channel cannot prove a remote process ended. Completed changes stay applied.
-A run left active after an app crash is displayed as unknown and never replayed.
+SSH starts without confirmation dialogs; only a required password/key passphrase
+prompts, and neither is saved. Fresh native handshakes pin each Ansible SSH server;
+changed known host keys fail. Runner uses a private exact-match known_hosts file.
+Workspace edits/switch/close are blocked during execution. External workspace source
+changes are rejected before the next invocation. Stop terminates the local process
+group; remote stop, timeout or disconnect may leave **Outcome unknown**. Completed
+changes remain applied. Interrupted or crashed runs are never replayed automatically.
 
-Reports live in the application-local `runs/` folder (0700, files 0600), scoped to
-workspace ID. The UI shows the latest 100; retention cleanup is not implemented.
-Results update after each command, rather than streaming every byte. Capture is
-32 KiB per phase and 256 KiB per report while both streams continue to drain.
-Literal string inputs are masked, but scripts must not print secrets: output is
-persisted and arbitrary secrets cannot be reliably detected. Review output before
-sharing. No production Ansible playbook, certificate, plugin or model operation
-has run as part of acceptance.
+Reports are private application-local files under `runs/`, scoped to workspace ID.
+The UI lists the latest 100; retention cleanup is pending. Output updates at task/phase
+completion, not every byte. Capture is 32 KiB per phase and 256 KiB per report;
+both streams continue to drain. Ansible `no_log` output is censored and only selected
+result fields are retained. Temporary Runner files are removed on return. Literal
+string inputs are masked, but arbitrary printed secrets cannot be reliably detected.
+Review output before sharing or exporting it.
+
+## ComfyUI / RunPod recipes
+
+Add an existing RunPod SSH endpoint in **Nodes**, register its SSH identity, then use
+**Test** or **Terminal**. In **ComfyUI Recipes**, choose **New recipe** (Cmd+K
+`recipe apply`). Enter the real ComfyUI directory and its Python environment path;
+template paths differ, so inspect your Pod rather than assuming the default is right.
+
+Add plugins using public HTTPS Git URLs and full 40-character commits. Add models
+using public HTTPS download URLs, SHA-256 hashes and destinations under `models/`
+(for example `loras/example.safetensors`). The form also accepts a minimum free disk
+size and optional ComfyUI node classes to verify. **Review Ansible YAML** opens the
+ordinary source editor; validate/save, then Run against the selected GPU node.
+
+The generated playbook checks the existing installation, NVIDIA GPU, free disk and
+contained paths; pins Git checkouts; installs plugin requirements into the selected
+ComfyUI environment; and downloads models with checksum verification. Check skips
+package installation and model downloads. Apply uses retries and atomic downloads.
+Restart ComfyUI using your template's service manager before verifying newly installed
+node classes through its running `object_info` API.
+
+MiniMax H3, Wan 2.2, LTX 2.3 and LoRA are labels, **not a verified model catalog or
+compatibility guarantee**. Supply exact publisher URLs, hashes and plugin commits.
+Authenticated/gated downloads, paid Pod provisioning, base ComfyUI/CUDA/PyTorch
+installation, automatic restarts and actual GPU inference acceptance are pending.
+No production certificate changes, remote plugin installs or model downloads have
+been performed during this increment's acceptance tests.
 
 ## Test a node connection
 
@@ -374,13 +472,27 @@ projection; runtime validation also enforces cross-file references and policy.
 
 The optional remote integration test authenticates, verifies existing host trust,
 checks review replay rejection, exercises a real PTY and bounded command execution,
-then executes the saved Linux facts scenario and checks its persistent report. It uses
+then executes the saved Linux facts scenario and checks its persistent report. With
+`GHOSH_CONTROLLER_PYTHON` set, it additionally runs read-only standard Ansible on both hosts. It uses
 a disposable workspace and your existing `~/.ssh/id_ed25519` (override with
 `GHOSH_SMOKE_KEY`). Run only when authorized to access both named test hosts:
 
 ```sh
 MACOSX_DEPLOYMENT_TARGET=14.0 CARGO_BUILD_JOBS=1 cargo test -p ghosh-desktop --lib --target aarch64-apple-darwin authorized_nodes_native_authentication -- --ignored --test-threads=1 --nocapture
 ```
+
+The optional upstream controller test uses only temporary local fixtures. It verifies
+Check/Apply/idempotence, includes, original project inventory/group_vars/roles/handlers,
+no_log censoring, failure, cancellation and private Runner cleanup:
+
+```sh
+GHOSH_CONTROLLER_PYTHON="$HOME/.local/share/ghosh/controller/bin/python" cargo test -p ghosh-desktop upstream_ansible_check_apply_include_no_log_failure_and_stop -- --ignored --test-threads=1
+```
+
+Latest local verification: **81 Rust tests and 28 UI journeys pass**, plus both
+opt-in controller/authorized-node tests above. Generated ComfyUI YAML passes upstream
+Ansible syntax checking; this is not GPU acceptance. Browser evidence 32–34 uses
+fixtures and does not substitute for these native integration checks.
 
 The optional native Keychain test creates, reads and deletes a temporary item:
 
@@ -400,7 +512,7 @@ Runner labels follow the [GitHub runner reference](https://docs.github.com/en/ac
 ## Tagged build artifacts
 
 Open a completed tagged run in [GitHub Actions](https://github.com/gubnota/ghosh/actions).
-Current artifacts contain a macOS `.app` archive, `SHA256SUMS` and license notices.
+Current artifacts contain a macOS `.app` archive, `SHA256SUMS`, controller requirements and license notices.
 The local packaging script also supports Linux `.deb` and binary archives, but
 Linux CI is disabled and no successful Linux artifact is claimed.
 These are unsigned development builds;
@@ -414,7 +526,7 @@ To reproduce packaging on the corresponding native architecture:
 ```sh
 npm ci
 bash scripts/check.sh
-bash scripts/build-release.sh v0.1.3
+bash scripts/build-release.sh v0.1.4
 ```
 
 Output is under ignored `artifacts/`. Increment package.json (and lockfile),

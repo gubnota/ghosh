@@ -68,3 +68,14 @@ Managed test key: 0600; containing directory: 0700; generation stages cleaned.
 Native keyboard selectors need the popup to open before arrow selection. Review,
 save and focus return were checked in the real app. Browser tests use explicit IPC
 fixtures and do not substitute for native filesystem/SSH/PTY acceptance.
+
+
+## 2026-10-19 — Browser fixtures for new authoring UI
+
+These are explicit IPC-fixture presentation captures, **not native execution or GPU evidence**.
+- [32](32-ansible-results-fixture.png): stored report and JSON export control.
+- [33](33-comfy-recipe-fixture.png): narrow recipe layout at 460×760; contained model/plugin inputs.
+- [34](34-comfy-wizard-fixture.png): full-width ComfyUI wizard with editable installation paths and pin/hash fields.
+
+Separate genuine Ansible controller and authorized Debian/node3 tests are recorded
+in TASK_LOG.md. No GPU installation or model download was performed.

@@ -58,7 +58,7 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
         }
         if (cmd === 'automations_list') return structuredClone(window.fixtureAutomations.map(document => ({id:document.id,kind:document.kind,validation:{valid:true,name:document.id,task_count:1,issues:[]}})));
         if (cmd === 'automation_read') return structuredClone(window.fixtureAutomations.find(document => document.id === args.request.id && document.kind === args.request.kind));
-        if (cmd === 'automation_preview') {const valid = args.request.remove || args.request.document.source.includes('schema: 1') || ['shell','python','deno'].includes(args.request.document.kind);return {digest:'automation-fixture',validation:{valid,name:args.request.document.id,task_count:1,issues:valid?[]:['Invalid native YAML.']}};}
+        if (cmd === 'automation_preview') {const valid = args.request.remove || (args.request.document.source.includes('schema: 1') || args.request.document.source.includes('hosts: all')) || ['shell','python','deno'].includes(args.request.document.kind);return {digest:'automation-fixture',validation:{valid,name:args.request.document.id,task_count:1,issues:valid?[]:['Invalid native YAML.']}};}
         if (cmd === 'automation_commit') {const mutation=args.request.mutation;window.fixtureAutomations=window.fixtureAutomations.filter(document => document.id !== mutation.document.id || document.kind !== mutation.document.kind);if(!mutation.remove)window.fixtureAutomations.push(structuredClone(mutation.document));window.fixtureWorkspace.revision+='-automation';return structuredClone(window.fixtureWorkspace);}
         if (cmd === 'nodes_list') return window.fixtureWorkspace.nodes.map(node => ({...node,schema:1,auth:{method:'agent',key_ref:null,password_ref:null,agent_socket:null},tunnel:'direct',jump:null}));
         if (cmd === 'nodes_preview') {
@@ -668,6 +668,8 @@ test("playbook and script editors validate, save exact source, reopen and protec
   await expect(dialog.getByLabel("ID", { exact: true })).toBeFocused();
   const source = dialog.getByLabel("Source", { exact: true });
   const original = await source.inputValue();
+  expect(original).toContain("check:");
+  expect(original).toContain("mkdir -p /tmp/ghosh-checked-example");
   await source.fill("invalid yaml");
   await dialog.getByRole("button", { name: "Validate", exact: true }).click();
   await expect(dialog.getByRole("status")).toContainText("Invalid native YAML");
@@ -677,7 +679,7 @@ test("playbook and script editors validate, save exact source, reopen and protec
   await dialog.getByRole("button", { name: "Validate", exact: true }).click();
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await page.getByRole("button", { name: "Edit linux-facts", exact: true }).click();
+  await page.getByRole("button", { name: "Edit checked-script", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Edit playbook" });
   await expect(edit.getByLabel("Source", { exact: true })).toHaveValue(exactSource);
   await edit.getByLabel("Source", { exact: true }).fill(exactSource + "# changed");
@@ -730,4 +732,98 @@ test("saved scenario runs on explicit targets without SSH confirmation and can s
   await page.getByText("1 task phase(s) · Results").click();
   await expect(page.locator(".run-results pre")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+});
+
+test("RU physical shortcuts navigate, search, save and close; composition and terminal Ctrl are preserved", async ({ page }) => {
+  await fixture(page);
+  const key = (key: string, code: string, modifiers: Record<string, boolean> = {}) => page.evaluate(({key, code, modifiers}) => {
+    const event = new KeyboardEvent("keydown", { key, code, metaKey: true, bubbles: true, cancelable: true, ...modifiers });
+    window.dispatchEvent(event); return event.defaultPrevented;
+  }, {key, code, modifiers});
+  expect(await key("л", "KeyK", {isComposing: true})).toBe(false);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await key("л", "KeyK");
+  await expect(page.getByRole("combobox", {name: "Search commands"})).toBeFocused();
+  await page.keyboard.press("Escape");
+  await key("З", "KeyP", {shiftKey: true});
+  await expect(page.getByRole("dialog", {name: "Command popup"})).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByLabel("Workspace name", {exact: true}).fill("RU saved");
+  await key("ы", "KeyS");
+  await expect(page.getByRole("heading", {name: "RU saved", exact: true})).toBeVisible();
+  await page.getByRole("navigation").getByRole("button", {name: "Nodes", exact: true}).click();
+  await key("а", "KeyF");
+  await expect(page.getByLabel("Filter nodes")).toBeFocused();
+  await key("т", "KeyN");
+  await expect(page.getByRole("dialog", {name: "Add node", exact: true})).toBeVisible();
+  await page.keyboard.press("Escape");
+  await key("х", "BracketLeft");
+  await expect(page.getByRole("tab", {name: "Overview", exact: true})).toHaveAttribute("aria-selected", "true");
+  await key("ъ", "BracketRight");
+  await expect(page.getByRole("tab", {name: "Nodes", exact: true})).toHaveAttribute("aria-selected", "true");
+  await key("!", "Digit1");
+  await expect(page.getByRole("tab", {name: "Overview", exact: true})).toHaveAttribute("aria-selected", "true");
+  await key("2", "Digit2");
+  await key("ц", "KeyW");
+  await expect(page.getByRole("tab", {name: "Nodes", exact: true})).toHaveCount(0);
+  await key("щ", "KeyO");
+  await expect(page.getByRole("dialog").getByLabel("Workspace location", {exact: true})).toBeVisible();
+  await page.keyboard.press("Escape");
+  await command(page, "terminal open");
+  await page.getByRole("button", {name: "Open shell", exact: true}).click();
+  await expect(page.locator(".xterm-helper-textarea")).toBeFocused();
+  expect(await key("л", "KeyK", {metaKey: false, ctrlKey: true})).toBe(false);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("linked upstream playbook accepts controller and inputs; results export as JSON", async ({page}) => {
+  await fixture(page);
+  await page.evaluate(() => { (window as any).fixtureAutomations = [{id: "existing-project", kind: "ansible", source: "schema: 1"}]; });
+  await command(page, "run plan");
+  const dialog = page.getByRole("dialog", {name: /^Run /});
+  await dialog.getByLabel("Ansible controller · absolute Python path").fill("/tmp/controller/bin/python");
+  await dialog.getByLabel("Inputs · JSON object").fill('{"deployment":"preview"}');
+  await dialog.getByRole("button", {name: "Start check", exact: true}).click();
+  const request = await page.evaluate(() => (window as any).fixtureRunRequest);
+  expect(request.controller_python).toBe("/tmp/controller/bin/python");
+  expect(JSON.parse(request.input)).toEqual({deployment: "preview"});
+  await page.getByRole("button", {name: "Stop run", exact: true}).click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", {name: "Export results · JSON"}).click();
+  expect((await download).suggestedFilename()).toContain("run-fixture");
+  await page.screenshot({path: "docs/evidence/ui-shell/32-ansible-results-fixture.png"});
+});
+
+test("ComfyUI recipe enforces pins and hashes then saves ordinary Ansible YAML without overflow", async ({page}) => {
+  await fixture(page);
+  await command(page, "recipe apply");
+  const dialog = page.getByRole("dialog", {name: "Create ComfyUI recipe"});
+  await page.screenshot({path: "docs/evidence/ui-shell/34-comfy-wizard-fixture.png"});
+  await dialog.getByRole("button", {name: "Review Ansible YAML", exact: true}).click();
+  await expect(dialog.getByRole("alert")).toContainText("Add at least one");
+  await dialog.getByRole("button", {name: "Add model", exact: true}).click();
+  await dialog.getByLabel("Public HTTPS model URL").fill("https://example.com/model.safetensors");
+  await dialog.getByLabel("Path inside models/ · e.g. loras/example.safetensors").fill("loras/example.safetensors");
+  await dialog.getByRole("button", {name: "Review Ansible YAML", exact: true}).click();
+  await expect(dialog.getByRole("alert")).toContainText("SHA-256");
+  await dialog.getByLabel("SHA-256 · 64 hex characters").fill("a".repeat(64));
+  await dialog.getByRole("button", {name: "Add plugin", exact: true}).click();
+  await dialog.getByLabel("Folder name").fill("example-node");
+  await dialog.getByLabel("Public HTTPS Git repository").fill("https://github.com/example/example-node.git");
+  await dialog.getByLabel("Full Git commit · 40 hex characters").fill("b".repeat(40));
+  await page.setViewportSize({width: 460, height: 760});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path: "docs/evidence/ui-shell/33-comfy-recipe-fixture.png"});
+  await dialog.getByRole("button", {name: "Review Ansible YAML", exact: true}).click();
+  const editor = page.getByRole("dialog", {name: "Create playbook"});
+  const source = await editor.getByLabel("Source", {exact: true}).inputValue();
+  expect(source).toContain("hosts: all"); expect(source).toContain("ansible.builtin.git:");
+  expect(source).toContain("ansible.builtin.get_url:"); expect(source).not.toContain("schema: 1");
+  // Save the exact generated YAML for an independent upstream syntax check.
+  await import("node:fs/promises").then(fs => fs.writeFile("/tmp/ghosh-comfy-generated.yml", source));
+  await editor.getByRole("button", {name: "Validate", exact: true}).click();
+  await editor.getByRole("button", {name: "Save", exact: true}).click();
+  await expect(page.getByRole("button", {name: "Run comfy-runpod", exact: true})).toBeVisible();
+  await page.getByRole("button", {name: "Edit comfy-runpod", exact: true}).click();
+  await expect(page.getByRole("dialog").getByLabel("Source", {exact: true})).toHaveValue(source);
 });

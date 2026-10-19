@@ -14,6 +14,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tauri::{AppHandle, Emitter};
+mod ansible;
 mod automation;
 mod history;
 mod local_exec;

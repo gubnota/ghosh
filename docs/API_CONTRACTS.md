@@ -189,13 +189,14 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Keyboard: open with Return/Space/arrows, highlight via arrows/Home/End/typeahead,
   Return commits, Escape cancels without dismissing its parent dialog, Tab advances.
 - Cmd+[ / Cmd+] cycle tabs with wrap; Cmd+Shift+W closes the workspace with draft/session guards.
+- Shortcuts normalize physical Key/Digit/Bracket event.code for RU/EN, with event.key fallback.
 - Cmd+1–9 selects displayed app tabs; absent positions do nothing. Cmd+W retains
   dirty/session guards; Cmd+Q retains ordinary native behavior.
 - Node select-all applies to visible rows and preserves hidden selections; mixed
   state is exposed. Neutral dots mean configured/unmonitored, not live online status.
 - Linux legacy SecretStore resolve/put/delete return SecretUnavailable; no fallback.
 - Release tag version must match package.json, Cargo workspace and Tauri config.
-  Workflow starts only for pushed v* tags; macOS job precedes Linux job.
+  Workflow starts only for pushed v* tags; only the macOS job is enabled; Linux remains commented out.
 
 ## Automation authoring
 - AutomationKind: playbook | ansible | shell | python | deno.
@@ -210,23 +211,37 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Native schema 1: name/tasks/check.command/shell.command; optional targets, timeout_s,
   retries, creates, unless, changed_when and named handlers/notify. Unknown fields fail.
 - Ansible schema 1: name, absolute project, relative playbook and optional inventory;
-  validation does not access the linked project; Ansible execution remains unavailable.
+  validation does not access the linked project. Run resolves contained canonical paths in place.
+- Playbook source may be a standard Ansible list of plays; inert validation checks YAML shape,
+  while upstream Ansible owns modules, roles, includes, Jinja and execution semantics.
+- Simple schema: 1 scenarios remain supported independently, without a controller dependency.
 
 
 ## Manual local-UI automation runs
-- run_start({automation:{context,id,kind},mode:check|apply,targets:[{node_id,connection}],input:JSON-object-string}) -> RunReport.
+- run_start({automation:{context,id,kind},mode:check|apply,targets:[{node_id,connection}],input:JSON-object-string,controller_python?:absolute-path|null}) -> RunReport.
 - Targets: 1–8 distinct IDs; @local has null connection, nodes use single-use NodeConnectionCommit tickets.
 - Requires current approved/editable source and revision, no conflicting job; all target tickets authenticate before task execution.
-- Scripts only Apply; Ansible rejected. Nonempty native YAML targets restrict requested node IDs.
+- Scripts only Apply. Simple YAML targets restrict requested node IDs. Standard Ansible supports Check/Apply.
 - One run per process; each target and invocation is sequential. Workspace mutation/close is Busy while active.
 - Before every invocation re-read source/revision; input max 32 KiB, no credential persistence.
-- Check exit 0=ok, 10=drift, other=failed. Apply invokes only on drift, then verifies 0.
+- Simple scenario Check exit 0=ok, 10=drift, other=failed. Apply invokes only on drift, then verifies 0.
+- Standard Ansible uses upstream --check / Apply and changed/failed/skipped module results.
+- Ansible requires explicit controller_python with pinned requirements-controller.txt; no auto-install.
+- Controller runs once per selected target, forks=1; linked inventory alias must equal node ID (@local=localhost).
+- Original roles/includes/group_vars/config remain in the linked project. Cross-host batch semantics are not provided.
+- External project source/dependencies are not frozen by workspace revision; linked code runs with user privileges.
+- Native handshake authenticates/pins each SSH server before Runner; private known_hosts is exact-match, no ssh_config routes.
+- Inputs become extra vars, but cannot override ansible_* or reserved inventory connection keys.
+- Private transient Runner files are removed on return; raw task events are not persisted in Ghosh reports.
+- Only whitelisted result fields are retained; no_log output is censored. Other printed secrets remain the author’s responsibility.
+- ComfyUI generator requires public HTTPS URLs, full Git commits, model SHA-256 and contained destinations.
+- It uses existing ComfyUI/Python, checks GPU/disk and optionally running object_info; no Pod provisioning or implicit restart.
 - Retries are explicit/bounded/fresh-check; no retry on interruption. Handlers run once per successfully changed node.
 - runs_list(RevisionRequest) -> latest 100 RunReport for workspace ID; listing remains inert after external changes.
-- run_stop(id) -> cancellation request; completed changes persist. Local group killed; remote interruption is outcome_unknown.
+- run_stop(id) -> cancellation request; completed changes persist. Local group stopped/reaped; remote interruption is outcome_unknown.
 - States: running/succeeded/failed/stopped/outcome_unknown. Task phases include check/apply/verify/script/connect.
 - Running snapshot without a live worker becomes unknown on read after crash; never replay.
 - Reports: app-local runs/<uuid>.json atomic snapshot and metadata-only .jsonl events; 0700/0600.
 - Output: 32 KiB/phase, 256 KiB/run, max 2,048 results; both streams drain beyond cap.
 - JSON string inputs masked; output remains sensitive. Inputs, credentials and unbounded output are never stored as request metadata.
-- UI polls at 1.2s; phase output appears after invocation, not byte streaming. No retention cleanup yet.
+- UI polls at 1.2s; output appears at task/phase completion, not byte streaming. Export JSON downloads the bounded stored report. No retention cleanup yet.

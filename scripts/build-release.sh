@@ -26,7 +26,7 @@ release_output="artifacts/${release_tag}-${release_platform}"
 mkdir -p "$release_output"
 release_stage="$(mktemp -d)"
 trap 'rm -rf "$release_stage"' EXIT
-cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md "$release_stage/"
+cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md README.md requirements-controller.txt "$release_stage/"
 if [[ "$release_platform" == macos-arm64 ]]; then
   cp -R "target/$release_target/release/bundle/macos/Ghosh.app" "$release_stage/"
 else

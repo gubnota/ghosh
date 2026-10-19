@@ -1,30 +1,41 @@
 import type { AutomationDocument } from "../../generated/contracts";
 
 export const examples: { label: string; description: string; document: AutomationDocument }[] = [
-  { label: "Inspect Linux node", description: "Read OS, uptime and disk information. The check prints facts and makes no changes.", document: {
-    id: "linux-facts", kind: "playbook", source: `schema: 1
-name: Inspect Linux node
-targets: []
+  { label: "Simple script with success check", description: "No Ansible required. Check the directory, create it only when missing, then verify success. Run locally or over SSH.", document: {
+    id: "checked-script", kind: "playbook", source: `schema: 1
+name: Simple script with success check
 tasks:
-  - name: Show system facts
+  - name: Create and verify example directory
     check:
-      command: 'uname -a; uptime; df -h /'
+      command: test -d /tmp/ghosh-checked-example || exit 10
     shell:
-      command: 'true'
+      command: mkdir -p /tmp/ghosh-checked-example
     timeout_s: 30
 ` } },
-  { label: "Create a temporary directory", description: "A small idempotent example: check returns 10 for drift, apply creates the directory, then check verifies it.", document: {
-    id: "temporary-directory", kind: "playbook", source: `schema: 1
-name: Create temporary example directory
-targets: []
-tasks:
-  - name: Ensure example directory exists
-    check:
-      command: 'if [ -d /tmp/ghosh-example ]; then exit 0; else exit 10; fi'
-    shell:
-      command: 'mkdir -p /tmp/ghosh-example'
-    timeout_s: 30
-    changed_when: exit_code == 0
+  { label: "Inspect Linux node", description: "Read OS, uptime and disk information. The check prints facts and makes no changes.", document: {
+    id: "linux-facts", kind: "playbook", source: `- name: Inspect Linux node
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show system facts
+      ansible.builtin.command: uname -a
+      changed_when: false
+      check_mode: false
+    - name: Read uptime
+      ansible.builtin.command: uptime
+      changed_when: false
+      check_mode: false
+` } },
+  { label: "Create a temporary directory", description: "Standard Ansible file module: Check predicts changes; Apply creates the directory idempotently.", document: {
+    id: "temporary-directory", kind: "playbook", source: `- name: Create temporary example directory
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ensure example directory exists
+      ansible.builtin.file:
+        path: /tmp/ghosh-example
+        state: directory
+        mode: '0700'
 ` } },
   { label: "Existing Ansible project", description: "Link the existing project. Roles, includes, templates, inventory and variables stay in that folder; no credentials are copied.", document: {
     id: "server-first-run", kind: "ansible", source: `schema: 1
@@ -41,12 +52,13 @@ uname -a
 uptime
 df -h /
 ` } },
-  { label: "Python · JSON result", description: "Return structured data for subsequent automation steps.", document: {
+  { label: "Python · JSON result", description: "Read GHOSH_INPUT and return a JSON result. Export the saved report from Runs.", document: {
     id: "json-result", kind: "python", source: `import json
+import os
 import platform
 import time
 
-print(json.dumps({"host": platform.node(), "system": platform.system(), "time": int(time.time())}))
+print(json.dumps({"host": platform.node(), "system": platform.system(), "time": int(time.time()), "input": json.loads(os.environ.get("GHOSH_INPUT", "{}"))}))
 ` } },
   { label: "Deno · process JSON", description: "Optional JavaScript/TypeScript runtime. Deno must already be installed on the selected machine.", document: {
     id: "process-result", kind: "deno", source: `const result = { host: Deno.hostname(), created: new Date().toISOString() };

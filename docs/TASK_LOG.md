@@ -391,3 +391,37 @@
 - Ansible Runner, certificate renewal/distribution, durable timers, monitoring,
   ComfyUI installs/downloads, browser sessions/recordings and scene automation
   remain pending. Result bindings and report-history cleanup also remain pending.
+
+
+## 2026-10-19 — RU/EN, upstream Ansible, script results and ComfyUI recipes
+
+- Clarified Keyboard layout with the user: physical hotkeys in RU/EN, no remapping.
+  Physical letters/digits/brackets preserve composition/Alt guards and terminal Ctrl input.
+- Added standard Ansible play-list execution through pinned ansible-core 2.20.10 /
+  ansible-runner 2.4.3 and explicit local controller Python. Linked project stays in place.
+  Original inventory, group_vars, roles, includes and handlers work. No Ansible dialect introduced.
+- User clarified simple custom scenarios are also useful: retain schema: 1 check/script/verify
+  and add a visible “Simple script with success check” example. No controller needed.
+  Standalone Shell/Python/Deno success remains exit-code based; report JSON can be exported.
+- Runner reuses fresh native authentication and exact server pins, private temporary files,
+  bounded filtered task events and no_log censoring. One invocation per selected node;
+  inventory alias must match node ID. External project source is not revision-frozen.
+  Full multi-host batch semantics and agent/password-specific Runner live acceptance remain.
+- ComfyUI wizard generates ordinary Ansible for existing SSH/GPU nodes: editable paths,
+  pinned plugin Git commits, requirements installation, checksum/atomic model downloads,
+  GPU/disk/path checks and optional running node-class checks. Family names are labels only.
+  No verified model catalog, paid provisioning, automatic restart or GPU inference acceptance.
+- Verification: full check.sh passes (81 Rust tests, 3 opt-in skipped, 28 sequential UI journeys;
+  formatting, warning-denied Clippy, generated contract freshness and strict frontend build).
+  Genuine local opt-in controller test passes Check/Apply/idempotence, includes/no_log/fail/Stop,
+  external roles/group_vars/inventory/handlers and private Runner cleanup (9.99 s).
+- Genuine read-only Ansible and existing native auth/PTY/exec/scenario acceptance passed
+  sequentially on debian.orb.local and node3.dabaga.cc (33.63 s total). No production writes.
+  Original /Users/vm/Documents/1.ghosh and private server-first-run inputs were untouched.
+- Generated ComfyUI YAML passes upstream Ansible syntax-check. Screenshots 32–34 are
+  explicitly browser IPC fixtures, separate from actual native evidence 29–31.
+- Timers, certificate orchestration, monitoring/Telegram, browser sessions/recordings and
+  scenes remain pending. Linux CI stays commented out.
+- Release 0.1.4: native macOS arm64 bundle built; version manifests aligned and
+  controller requirements included in the archive. Archive SHA-256 verification
+  passed. Main/tag publication is authorized; GitHub CI status is tracked separately.

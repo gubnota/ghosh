@@ -4,18 +4,20 @@ import { Dialog } from "../../components/Dialog";
 import { Icon } from "../../components/Icon";
 import { Select } from "../../components/Select";
 import type { AutomationDocument, AutomationKind, AutomationPreview, AutomationSummary, WorkspaceSnapshot } from "../../generated/contracts";
+import { ComfyDialog } from "../comfy/ComfyDialog";
 import { RunDialog } from "./RunDialog";
 import { examples } from "./examples";
 
 export type AutomationAction = "new" | "import" | "edit" | "check" | "apply";
 type Draft = { document: AutomationDocument; replace: boolean; initial: string; remove?: boolean };
-const labels: Record<AutomationKind, string> = { playbook: "Native YAML", ansible: "Ansible project", shell: "Shell", python: "Python", deno: "Deno · JS / TS" };
-export function AutomationView({ workspace, scripts, request, requestHandled, modalChanged, busyChanged, update, started }: {
-  workspace: WorkspaceSnapshot; scripts: boolean;
+const labels: Record<AutomationKind, string> = { playbook: "Simple scenario / Ansible YAML", ansible: "Ansible project", shell: "Shell", python: "Python", deno: "Deno · JS / TS" };
+export function AutomationView({ workspace, scripts, recipes = false, request, requestHandled, modalChanged, busyChanged, update, started }: {
+  workspace: WorkspaceSnapshot; scripts: boolean; recipes?: boolean;
   request: { action: AutomationAction; scripts: boolean; sequence: number } | null;
   requestHandled: () => void; modalChanged: (open: boolean) => void; busyChanged: (busy: boolean) => void;
   update: (workspace: WorkspaceSnapshot) => void; started: () => void;
 }) {
+  const [comfy, setComfy] = useState(false);
   const [items, setItems] = useState<AutomationSummary[]>([]), [query, setQuery] = useState("");
   const [loadedRevision, setLoadedRevision] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null), [preview, setPreview] = useState<AutomationPreview | null>(null);
@@ -24,7 +26,7 @@ export function AutomationView({ workspace, scripts, request, requestHandled, mo
   const [runItem, setRunItem] = useState<AutomationSummary | null>(null), [runMode, setRunMode] = useState<"check" | "apply">("check");
   const editable = !workspace.read_only && !workspace.external_changed;
   const context = { workspace_id: workspace.id, revision: workspace.revision };
-  const shown = items.filter(item => (["shell", "python", "deno"].includes(item.kind)) === scripts);
+  const shown = items.filter(item => (["shell", "python", "deno"].includes(item.kind)) === scripts && (!recipes || item.id.startsWith("comfy-")));
   const offered = examples.filter(example => ["shell", "python", "deno"].includes(example.document.kind) === scripts);
   useEffect(() => {
     let alive = true;
@@ -32,7 +34,7 @@ export function AutomationView({ workspace, scripts, request, requestHandled, mo
     void api.automations(context).then(value => { if (alive) { setItems(value); setLoadedRevision(`${workspace.id}:${workspace.revision}`); } }).catch(e => { if (alive) setError(errorMessage(e)); });
     return () => { alive = false; };
   }, [workspace.id, workspace.revision]);
-  useEffect(() => { modalChanged(!!draft || !!runItem); return () => modalChanged(false); }, [!!draft, !!runItem, modalChanged]);
+  useEffect(() => { modalChanged(!!draft || !!runItem || comfy); return () => modalChanged(false); }, [!!draft, !!runItem, comfy, modalChanged]);
   useEffect(() => { busyChanged(busy); return () => busyChanged(false); }, [busy, busyChanged]);
   const run = async (action: () => Promise<void>) => { setBusy(true); setError(""); try { await action(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); } };
   const create = (document = offered[0].document) => { setError(""); setPreview(null); setDiscard(false); setDraft({ document: { ...document }, replace: false, initial: JSON.stringify(document) }); };
@@ -44,7 +46,7 @@ export function AutomationView({ workspace, scripts, request, requestHandled, mo
     if (request && request.scripts === scripts && request.sequence > handled.current) {
       if (["edit", "check", "apply"].includes(request.action) && loadedRevision !== `${workspace.id}:${workspace.revision}`) return;
       handled.current = request.sequence; requestHandled();
-      if (editable) { if (["check", "apply"].includes(request.action)) { const item = shown.find(item => item.kind !== "ansible" && item.validation.valid); if (item) { setRunItem(item); setRunMode(request.action === "check" ? "check" : "apply"); } else setError("Save a valid native playbook or script first. Ansible execution is not connected yet."); } else if (request.action === "edit" && shown[0]) edit(shown[0]); else create(); }
+      if (editable) { if (["check", "apply"].includes(request.action)) { const item = shown.find(item => item.validation.valid); if (item) { setRunItem(item); setRunMode(request.action === "check" ? "check" : "apply"); } else setError("Save a valid playbook or script first."); } else if (request.action === "edit" && shown[0]) edit(shown[0]); else if (recipes) setComfy(true); else create(); }
     }
   }, [request, editable, shown.length, loadedRevision, workspace.id, workspace.revision]);
   const dismiss = () => {
@@ -55,13 +57,14 @@ export function AutomationView({ workspace, scripts, request, requestHandled, mo
   const change = (document: AutomationDocument) => { if (draft) setDraft({ ...draft, document }); setPreview(null); setDiscard(false); };
   const mutation = draft ? { context, document: draft.document, replace: draft.replace, remove: !!draft.remove } : null;
   return <>
-    <div className="page-heading"><div><p className="eyebrow">{scripts ? "AUTOMATION" : "INFRASTRUCTURE"}</p><h1>{scripts ? "Scripts" : "Playbooks"} <span className="count">{shown.length}</span></h1><p>{scripts ? "Shell, Python and Deno sources in your workspace." : "Native scenarios and links to existing Ansible projects."}</p></div><div className="inline-actions"><button disabled={!editable || busy} onClick={() => create()}><Icon name="Upload" />Import source</button><button className="primary" disabled={!editable || busy} onClick={() => create()}><Icon name="Plus" />{scripts ? "New script" : "New playbook"}</button></div></div>
+    <div className="page-heading"><div><p className="eyebrow">{scripts ? "AUTOMATION" : "INFRASTRUCTURE"}</p><h1>{recipes ? "ComfyUI Recipes" : scripts ? "Scripts" : "Playbooks"} <span className="count">{shown.length}</span></h1><p>{scripts ? "Shell, Python and Deno sources in your workspace." : recipes ? "Pinned plugins and verified model downloads for existing RunPod SSH nodes." : "Simple checked scripts, standard Ansible playbooks and existing projects."}</p></div><div className="inline-actions"><button disabled={!editable || busy} onClick={() => create()}><Icon name="Upload" />Import source</button><button className="primary" disabled={!editable || busy} onClick={() => recipes ? setComfy(true) : create()}><Icon name="Plus" />{recipes ? "New recipe" : scripts ? "New script" : "New playbook"}</button></div></div>
     {error && !draft && <p className="form-error" role="alert">{error}</p>}
     <section className="panel"><div className="table-toolbar"><input data-surface-search aria-label={`Filter ${scripts ? "scripts" : "playbooks"}`} placeholder="Filter by name, ID or runtime…" value={query} onChange={e => setQuery(e.target.value)} /></div>
-      {shown.length ? <div className="automation-list">{shown.filter(item => `${item.id} ${item.validation.name} ${labels[item.kind]}`.toLowerCase().includes(query.toLowerCase())).map(item => <article className="automation-row" key={`${item.kind}:${item.id}`}><div><strong title={item.validation.name}>{item.validation.name}</strong><p className="field-help">{item.id} · {labels[item.kind]} · {item.validation.valid ? `${item.validation.task_count || "Project"} ${item.validation.task_count ? "task(s)" : "link"}` : "Needs correction"}</p></div><div className="inline-actions"><button disabled={!editable || busy || !workspace.trusted || !item.validation.valid || item.kind === "ansible"} title={item.kind === "ansible" ? "Ansible execution is not connected yet" : "Choose targets and run"} aria-label={`Run ${item.id}`} onClick={() => { setRunMode(item.kind === "playbook" ? "check" : "apply"); setRunItem(item); }}><Icon name="Play" />Run</button><button disabled={!editable || busy} aria-label={`Edit ${item.id}`} onClick={() => edit(item)}><Icon name="Pencil" />Edit</button><button disabled={!editable || busy} aria-label={`Remove ${item.id}`} onClick={() => edit(item, true)}><Icon name="Trash2" />Remove</button></div></article>)}</div> : <div className="empty-state"><h3>{scripts ? "Create your first script" : "Create your first scenario"}</h3><p>Start with an example below, or paste your own source.</p></div>}
+      {shown.length ? <div className="automation-list">{shown.filter(item => `${item.id} ${item.validation.name} ${labels[item.kind]}`.toLowerCase().includes(query.toLowerCase())).map(item => <article className="automation-row" key={`${item.kind}:${item.id}`}><div><strong title={item.validation.name}>{item.validation.name}</strong><p className="field-help">{item.id} · {labels[item.kind]} · {item.validation.valid ? `${item.validation.task_count || "Project"} ${item.validation.task_count ? "task(s)" : "link"}` : "Needs correction"}</p></div><div className="inline-actions"><button disabled={!editable || busy || !workspace.trusted || !item.validation.valid} title="Choose targets and run" aria-label={`Run ${item.id}`} onClick={() => { setRunMode(["playbook", "ansible"].includes(item.kind) ? "check" : "apply"); setRunItem(item); }}><Icon name="Play" />Run</button><button disabled={!editable || busy} aria-label={`Edit ${item.id}`} onClick={() => edit(item)}><Icon name="Pencil" />Edit</button><button disabled={!editable || busy} aria-label={`Remove ${item.id}`} onClick={() => edit(item, true)}><Icon name="Trash2" />Remove</button></div></article>)}</div> : <div className="empty-state"><h3>{scripts ? "Create your first script" : "Create your first scenario"}</h3><p>Start with an example below, or paste your own source.</p></div>}
     </section>
-    <section className="panel"><h2>Examples</h2><div className="automation-examples">{offered.map(example => <article key={example.document.id}><h3>{example.label}</h3><p>{example.description}</p><button disabled={!editable || busy} onClick={() => create(example.document)}>Use example<Icon name="ArrowUpRight" /></button></article>)}</div></section>
-    <p className="field-help">{workspace.external_changed ? "Reload the workspace from Overview before editing." : "Saving keeps the exact source. Opening or validating a document does not execute it."} {scripts ? "Validation checks source bounds. Run executes on the selected targets and checks for the required interpreter." : "Native shell tasks require an explicit check: exit 0 means in sync, 10 means drift, any other code means failure."}</p>
+    {!recipes && <section className="panel"><h2>Examples</h2><div className="automation-examples">{offered.map(example => <article key={example.document.id}><h3>{example.label}</h3><p>{example.description}</p><button disabled={!editable || busy} onClick={() => create(example.document)}>Use example<Icon name="ArrowUpRight" /></button></article>)}</div></section>}
+    <p className="field-help">{workspace.external_changed ? "Reload the workspace from Overview before editing." : "Saving keeps the exact source. Opening or validating a document does not execute it."} {scripts ? "Validation checks source bounds. Run executes on the selected targets and checks for the required interpreter." : "Ansible owns modules, roles, includes, handlers and Check mode. Simple schema: 1 scenarios check state, run a script on drift, then verify success without Ansible."}</p>
+    {comfy && <ComfyDialog dismiss={() => setComfy(false)} created={document => { setComfy(false); create({ ...document, id: document.id.startsWith("comfy-") ? document.id : `comfy-${document.id}` }); }} />}
     {runItem && <RunDialog workspace={workspace} item={runItem} initialMode={runMode} dismiss={() => setRunItem(null)} started={() => { setRunItem(null); started(); }} busyChanged={busyChanged} />}
     {draft && <Dialog title="automation-title" className="automation-dialog" busy={busy} dismiss={dismiss}>
       <h2 id="automation-title">{draft.remove ? "Remove" : draft.replace ? "Edit" : "Create"} {scripts ? "script" : "playbook"}</h2>
@@ -71,7 +74,7 @@ export function AutomationView({ workspace, scripts, request, requestHandled, mo
           const example = examples.find(item => item.document.kind === kind)!;
           change({ ...draft.document, kind, source: example.document.source });
         }}>{(scripts ? ["shell", "python", "deno"] : ["playbook", "ansible"]).map(kind => <option value={kind} key={kind}>{labels[kind as AutomationKind]}</option>)}</Select></div></div>
-        {!draft.replace && <><label htmlFor="automation-example">Start from example</label><Select id="automation-example" value="" disabled={busy} onChange={e => change({ ...examples.find(item => item.document.id === e.target.value)!.document })}><option value="" disabled>Choose an example…</option>{offered.map(example => <option key={example.document.id} value={example.document.id}>{example.label}</option>)}</Select></>}
+        {!draft.replace && !recipes && <><label htmlFor="automation-example">Start from example</label><Select id="automation-example" value="" disabled={busy} onChange={e => change({ ...examples.find(item => item.document.id === e.target.value)!.document })}><option value="" disabled>Choose an example…</option>{offered.map(example => <option key={example.document.id} value={example.document.id}>{example.label}</option>)}</Select></>}
         <label htmlFor="automation-source">{draft.document.kind === "ansible" ? "Project link · YAML" : "Source"}</label><textarea id="automation-source" className="source-editor" spellCheck={false} autoCapitalize="off" autoCorrect="off" value={draft.document.source} disabled={busy} onChange={e => change({ ...draft.document, source: e.target.value })} />
         <p className="field-help">{draft.document.kind === "ansible" ? "Use an absolute project directory and paths relative to it. The linked project stays in place. Keep credentials in its existing private files." : "Do not put passwords, tokens or private keys in source. Use non-secret JSON inputs; credential storage for scripts is not connected yet."}</p>
       </>}

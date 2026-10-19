@@ -204,3 +204,26 @@ fn symlink_sources_cannot_escape_workspace() {
     assert!(Workspace::open(&root, &tmp.path().join("locks")).is_err());
     assert_eq!(fs::read_to_string(outside).unwrap(), "echo outside");
 }
+
+#[test]
+fn standard_ansible_is_preserved_without_a_ghosh_task_schema() {
+    let source = "# upstream syntax\n- name: Original\n  hosts: web\n  roles: [existing_role]\n  vars: { message: '{{ inventory_hostname }}' }\n  tasks:\n    - ansible.builtin.include_tasks: tasks.yml\n    - block:\n        - ansible.builtin.debug: {msg: '{{ message }}'}\n      rescue:\n        - ansible.builtin.fail: {msg: failed}\n  handlers:\n    - name: Reload\n      ansible.builtin.service: {name: nginx, state: reloaded}\n";
+    let (_tmp, mut workspace) = fixture();
+    let mut change = mutation(&workspace);
+    change.document.source = source.into();
+    assert!(uses_ansible(&change.document));
+    assert!(validate(&change.document).valid);
+    let commit = reviewed(&workspace, change);
+    workspace
+        .automation_commit(Principal::LocalUi, &commit, &Cancellation::default())
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(workspace.root().join("playbooks/facts.yml")).unwrap(),
+        source
+    );
+    assert!(!uses_ansible(&AutomationDocument {
+        id: "legacy".into(),
+        kind: AutomationKind::Playbook,
+        source: SOURCE.into()
+    }));
+}

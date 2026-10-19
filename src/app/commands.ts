@@ -44,7 +44,7 @@ export const commands: Command[] = [
   { id: "browser.open", label: "Open browser tab", syntax: "browser open", group: "Browser", destination: "browser" },
   { id: "route.switch", label: "Switch route", syntax: "route switch", group: "Routes", destination: "tunnels" },
   { id: "certificate.renew", label: "Renew certificate", syntax: "certificate renew", group: "Certificates", destination: "certificates" },
-  { id: "recipe.apply", label: "Apply ComfyUI recipe", syntax: "recipe apply", group: "Recipes", destination: "recipes" },
+  { id: "recipe.apply", label: "Create ComfyUI recipe", syntax: "recipe apply", group: "Recipes", destination: "recipes" },
   { id: "mcp.settings", label: "MCP server settings", syntax: "mcp settings", group: "System", destination: "mcp" },
   { id: "jobs.open", label: "Background jobs", syntax: "jobs", group: "System", destination: "jobs" },
   { id: "approvals.open", label: "Approvals inbox", syntax: "approvals", group: "System", destination: "approvals" },
@@ -70,6 +70,6 @@ export function commandReason(command: Command, context: { desktop: boolean; wor
   if (command.id === "node.test" || command.id === "node.terminal") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload this workspace before testing." : !context.trusted ? "Workspace operations are paused. Resume them in Overview." : null;
   if (["node.add", "node.edit"].includes(command.id)) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing inventory.";
   if (command.id === "run.plan" || command.id === "run.apply") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload the workspace first." : !context.trusted ? "Resume workspace operations in Overview." : null;
-  if (command.id.startsWith("playbook.") || command.id.startsWith("script.")) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing automation.";
+  if (command.id.startsWith("playbook.") || command.id.startsWith("script.") || command.id === "recipe.apply") return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing automation.";
   return `${command.group} service is not available in this build.`;
 }

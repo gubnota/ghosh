@@ -8,7 +8,9 @@
 | crates/ghosh-core/src/workspace/inventory.rs, identity.rs | Revisioned node CRUD, file identities and explicit schema migration |
 | crates/ghosh-core/src/automation.rs, workspace/automation.rs | Inert source validation/catalog, revision-bound authoring |
 | src-tauri/src/services/automation.rs | Local UI authoring bridge; no generic filesystem endpoint |
-| src/features/automation | Catalogs/editors, Run target/input dialog and durable Runs UI |
+| src/features/automation | Catalogs/editors, simple checked scripts + Ansible examples, Run dialog and JSON report export |
+| src/features/comfy/ComfyDialog.tsx, playbook.ts | Keyboard recipe form and standard Ansible generator, no parallel execution engine |
+| src-tauri/src/services/ansible.rs, ansible_bridge.py | Native reviewed identities, private upstream Runner invocation, filtered NDJSON events |
 | crates/ghosh-core/src/runs.rs | Sequential check/apply/verify engine, handler/retry rules, bounded result DTOs |
 | crates/ghosh-ssh/src/exec.rs | Non-PTY SSH execution, dual-stream drain, cancellation/timeout |
 | src-tauri/src/services/runs.rs, local_exec.rs | Revision-bound worker, local process groups, private durable reports and stop |
@@ -39,14 +41,14 @@
 | src-tauri/src/platform | Native OpenSSH key generator/inspector; separate Keychain adapter and optional integration test |
 | src/main.tsx | React entry |
 | src/app/App.tsx | Welcome/create/open/close/restore/recent, busy/error/draft/document-open guards |
-| src/app/AppShell.tsx, commands.ts, tabs.ts | Nightfly shell, action registry and stable tabs |
+| src/app/AppShell.tsx, commands.ts, tabs.ts, keyboard.ts | Nightfly shell, action registry, stable tabs and physical RU/EN shortcuts |
 | src/components/Dialog.tsx, src/app/CommandPopup.tsx | Keyboard popup, trapped modal focus and restoration |
 | src/app/useOperations.ts | Subscribe-before-fetch operation snapshots and sequence reconciliation |
 | src/features/operations | Native jobs and approval review/audit views |
 | src/features/nodes, src/features/settings | Node CRUD/editor and local appearance/keyboard settings |
 | src/features/keys | Key library and workspace-identity migration dialogs |
 | src/features/terminal/TerminalView.tsx | xterm sessions, split/search/paste review and terminal focus |
-| tests/ui/shell.spec.ts, playwright.config.ts | 25 sequential browser presentation tests with explicit IPC fixtures |
+| tests/ui/shell.spec.ts, playwright.config.ts | 28 sequential browser presentation tests with explicit IPC fixtures |
 | src/app/ipc.ts | Typed commands and event subscriptions |
 | src/features/workspace/WorkspaceView.tsx | Name editing, inventory, local approval/pause, conflict/reload/details |
 | src/styles.css | Nightfly responsive keyboard-first desktop presentation |
@@ -57,6 +59,7 @@
 ## Existing build and configuration
 - Rust: Cargo.toml/Cargo.lock, rust-toolchain.toml; four members: core, term, ssh and desktop.
 - Frontend: package.json/package-lock.json, tsconfig.json, vite.config.ts, index.html.
+- Optional Ansible controller: requirements-controller.txt; explicit Python virtualenv, not bundled or installed on nodes.
 - Shell: src-tauri/tauri.conf.json, Info.plist, build.rs, capabilities/, permissions/.
 - CI: .github/workflows/ci.yml; tag-only macOS arm64; Linux job temporarily commented out per user.
 - Release: scripts/verify-release.mjs, check.sh, build-release.sh; ignored artifacts/.
@@ -94,11 +97,11 @@
 
 ## Future modules — no source directories yet
 - Extend existing ghosh-ssh: pool/channels/SFTP/jumps/persistent host enrollment (M1.2).
-- ghosh-core tasks/adapters: execution engine and resource adapters (M1.3).
+- Extend existing ghosh-core runs: typed resource adapters and richer result bindings (M1.3).
 - ghosh-term manages local and direct SSH PTYs; route-loss recovery remains pending.
 - ghosh-webview and ghosh-tunnel: all multiwebview types, profile stores/routes (M3).
 - ghosh-certs: issue/deploy/verify certificates (M4).
 - ghosh-script and ghosh-recorder: runtimes/editor/recording/replay (M5).
-- ghosh-comfy: pinned recipe orchestration (M6).
+- Extend current ComfyUI generator/Ansible adapter: GPU acceptance, catalog and lifecycle orchestration (M6).
 - ghosh-mcp and ghosh-cli: shared-core adapters and running-app attachment (M7).
 - Cross-service/native conformance fixtures will be added with their owning services.

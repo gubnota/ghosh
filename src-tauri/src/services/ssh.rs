@@ -93,6 +93,54 @@ fn known_hosts() -> Result<Vec<String>> {
 }
 
 impl Services {
+    pub(super) fn runner_identity(
+        &self,
+        request: &NodeConnectionRequest,
+        ticket: &str,
+        cancel: &Cancellation,
+    ) -> Result<serde_json::Value> {
+        let guard = self.active.lock().map_err(poisoned)?;
+        let active = guard.as_ref().ok_or_else(denied)?;
+        let keys = self.keys()?;
+        let (node, identity) = prepare(active, request, &keys)?;
+        match node.auth.method {
+            AuthMethod::Key => {
+                let access = SecretAccess::authorize(
+                    Principal::NativeService,
+                    &request.context.workspace_id,
+                    true,
+                )?;
+                let private = self.with_keys(|keys| {
+                    keys.resolve(
+                        &access,
+                        identity.key_id.as_deref().ok_or_else(denied)?,
+                        &identity.registry_revision,
+                    )
+                })?;
+                Ok(
+                    serde_json::json!({"ssh_key": std::str::from_utf8(&private).map_err(|_| denied())?}),
+                )
+            }
+            // Pin the selected agent key through a public IdentityFile with
+            // IdentitiesOnly. OpenSSH still obtains signing from that agent.
+            AuthMethod::Agent => {
+                let (socket, public) = {
+                    let reviews = self.ssh_reviews.lock().map_err(poisoned)?;
+                    let review = reviews
+                        .iter()
+                        .find(|r| r.ticket == ticket && r.request.node_id == request.node_id)
+                        .ok_or_else(denied)?;
+                    (
+                        review.agent_socket.clone().ok_or_else(denied)?,
+                        review.identity.public.clone().ok_or_else(denied)?,
+                    )
+                };
+                let public = ghosh_ssh::agent_public_record(socket.clone(), public, cancel)?;
+                Ok(serde_json::json!({"agent_socket": socket, "public_key": public}))
+            }
+            AuthMethod::Password => Ok(serde_json::json!({"password_auth": true})),
+        }
+    }
     pub fn connection_preview(
         &self,
         request: NodeConnectionRequest,
@@ -648,6 +696,7 @@ mod tests {
                 mode: RunMode::Check,
                 targets,
                 input: "{}".into(),
+                controller_python: None,
             })
             .unwrap();
         let deadline = Instant::now() + Duration::from_secs(45);
@@ -666,6 +715,76 @@ mod tests {
         assert!(report.results.iter().all(|result| result.phase == "check"
             && result.output.contains("Linux")
             && result.output.contains("exec-stderr")));
+        if let Ok(python) = std::env::var("GHOSH_CONTROLLER_PYTHON") {
+            let snapshot = service.snapshot().unwrap().unwrap();
+            let mutation = AutomationMutation { context: RevisionRequest { workspace_id: snapshot.id, revision: snapshot.revision }, document: AutomationDocument { id: "ansible-facts".into(), kind: AutomationKind::Playbook, source: "- name: Authorized upstream facts\n  hosts: all\n  gather_facts: false\n  tasks:\n    - name: Read-only facts\n      ansible.builtin.shell: uname -s; uptime; printf exec-stderr >&2\n      changed_when: false\n      check_mode: false\n".into() }, replace: false, remove: false };
+            let preview = service.automation_preview(mutation.clone()).unwrap();
+            let snapshot = service
+                .automation_commit(AutomationCommit {
+                    mutation,
+                    digest: preview.digest,
+                })
+                .unwrap();
+            let context = RevisionRequest {
+                workspace_id: snapshot.id,
+                revision: snapshot.revision,
+            };
+            let targets = nodes
+                .iter()
+                .map(|(id, _)| {
+                    let preview = service
+                        .connection_preview(NodeConnectionRequest {
+                            context: context.clone(),
+                            node_id: (*id).into(),
+                        })
+                        .unwrap();
+                    RunTarget {
+                        node_id: (*id).into(),
+                        connection: Some(NodeConnectionCommit {
+                            ticket: preview.ticket,
+                            allow_unknown: false,
+                            credential: credential.clone(),
+                        }),
+                    }
+                })
+                .collect();
+            let started = service
+                .run_start(RunRequest {
+                    automation: AutomationReadRequest {
+                        context: context.clone(),
+                        id: "ansible-facts".into(),
+                        kind: AutomationKind::Playbook,
+                    },
+                    mode: RunMode::Check,
+                    targets,
+                    input: "{}".into(),
+                    controller_python: Some(python),
+                })
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(90);
+            while service.run_active().unwrap() {
+                assert!(Instant::now() < deadline);
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            let report = service
+                .runs_list(context)
+                .unwrap()
+                .into_iter()
+                .find(|r| r.id == started.id)
+                .unwrap();
+            assert_eq!(report.state, RunState::Succeeded, "{:?}", report.results);
+            assert_eq!(report.results.len(), nodes.len(), "{:?}", report.results);
+            assert!(
+                report
+                    .results
+                    .iter()
+                    .all(|r| r.output.contains("Linux") && r.output.contains("exec-stderr"))
+            );
+            eprintln!(
+                "upstream Ansible with exact OpenSSH host pins passed on {} node(s)",
+                nodes.len()
+            );
+        }
         eprintln!(
             "saved native scenario → SSH → bounded persisted report passed for {} node(s)",
             nodes.len()

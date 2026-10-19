@@ -1,0 +1,3 @@
+# Controller only; nothing is installed on nodes by opening a workspace.
+ansible-core==2.20.10
+ansible-runner==2.4.3
