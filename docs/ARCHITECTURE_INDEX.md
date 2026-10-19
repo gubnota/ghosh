@@ -8,7 +8,10 @@
 | crates/ghosh-core/src/workspace/inventory.rs, identity.rs | Revisioned node CRUD, file identities and explicit schema migration |
 | crates/ghosh-core/src/automation.rs, workspace/automation.rs | Inert source validation/catalog, revision-bound authoring |
 | src-tauri/src/services/automation.rs | Local UI authoring bridge; no generic filesystem endpoint |
-| src/features/automation | Playbook/Script catalogs, examples and source editors |
+| src/features/automation | Catalogs/editors, Run target/input dialog and durable Runs UI |
+| crates/ghosh-core/src/runs.rs | Sequential check/apply/verify engine, handler/retry rules, bounded result DTOs |
+| crates/ghosh-ssh/src/exec.rs | Non-PTY SSH execution, dual-stream drain, cancellation/timeout |
+| src-tauri/src/services/runs.rs, local_exec.rs | Revision-bound worker, local process groups, private durable reports and stop |
 | crates/ghosh-core/tests/automation.rs | Persistence/inertness/conflict/path/schema tests |
 | crates/ghosh-core/src/terminal.rs | Bounded session/packet/size IPC DTOs and injected Pty port |
 | crates/ghosh-core/src/ssh.rs | Public review/result DTOs and per-call zeroizing credential request |
@@ -43,7 +46,7 @@
 | src/features/nodes, src/features/settings | Node CRUD/editor and local appearance/keyboard settings |
 | src/features/keys | Key library and workspace-identity migration dialogs |
 | src/features/terminal/TerminalView.tsx | xterm sessions, split/search/paste review and terminal focus |
-| tests/ui/shell.spec.ts, playwright.config.ts | 24 sequential browser presentation tests with explicit IPC fixtures |
+| tests/ui/shell.spec.ts, playwright.config.ts | 25 sequential browser presentation tests with explicit IPC fixtures |
 | src/app/ipc.ts | Typed commands and event subscriptions |
 | src/features/workspace/WorkspaceView.tsx | Name editing, inventory, local approval/pause, conflict/reload/details |
 | src/styles.css | Nightfly responsive keyboard-first desktop presentation |
@@ -55,7 +58,7 @@
 - Rust: Cargo.toml/Cargo.lock, rust-toolchain.toml; four members: core, term, ssh and desktop.
 - Frontend: package.json/package-lock.json, tsconfig.json, vite.config.ts, index.html.
 - Shell: src-tauri/tauri.conf.json, Info.plist, build.rs, capabilities/, permissions/.
-- CI: .github/workflows/ci.yml; tag-only macOS arm64 then Linux x86_64 jobs.
+- CI: .github/workflows/ci.yml; tag-only macOS arm64; Linux job temporarily commented out per user.
 - Release: scripts/verify-release.mjs, check.sh, build-release.sh; ignored artifacts/.
 - Shared UI: src/components/Select.tsx, Icon.tsx, Shortcut.tsx; styling in src/styles.css.
 - Linux legacy-secret boundary: src-tauri/src/platform/unavailable.rs; no plaintext fallback.

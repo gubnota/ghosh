@@ -197,7 +197,7 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Release tag version must match package.json, Cargo workspace and Tauri config.
   Workflow starts only for pushed v* tags; macOS job precedes Linux job.
 
-## Automation authoring (implemented; execution pending)
+## Automation authoring
 - AutomationKind: playbook | ansible | shell | python | deno.
 - AutomationDocument {id, kind, source}; max 256 KiB UTF-8, safe entity ID, no NUL.
 - automations_list(RevisionRequest) -> AutomationSummary[]; automation_read({context,id,kind}) -> document.
@@ -210,4 +210,23 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Native schema 1: name/tasks/check.command/shell.command; optional targets, timeout_s,
   retries, creates, unless, changed_when and named handlers/notify. Unknown fields fail.
 - Ansible schema 1: name, absolute project, relative playbook and optional inventory;
-  validation does not access the linked project. No script execution/interpreter checks yet.
+  validation does not access the linked project; Ansible execution remains unavailable.
+
+
+## Manual local-UI automation runs
+- run_start({automation:{context,id,kind},mode:check|apply,targets:[{node_id,connection}],input:JSON-object-string}) -> RunReport.
+- Targets: 1–8 distinct IDs; @local has null connection, nodes use single-use NodeConnectionCommit tickets.
+- Requires current approved/editable source and revision, no conflicting job; all target tickets authenticate before task execution.
+- Scripts only Apply; Ansible rejected. Nonempty native YAML targets restrict requested node IDs.
+- One run per process; each target and invocation is sequential. Workspace mutation/close is Busy while active.
+- Before every invocation re-read source/revision; input max 32 KiB, no credential persistence.
+- Check exit 0=ok, 10=drift, other=failed. Apply invokes only on drift, then verifies 0.
+- Retries are explicit/bounded/fresh-check; no retry on interruption. Handlers run once per successfully changed node.
+- runs_list(RevisionRequest) -> latest 100 RunReport for workspace ID; listing remains inert after external changes.
+- run_stop(id) -> cancellation request; completed changes persist. Local group killed; remote interruption is outcome_unknown.
+- States: running/succeeded/failed/stopped/outcome_unknown. Task phases include check/apply/verify/script/connect.
+- Running snapshot without a live worker becomes unknown on read after crash; never replay.
+- Reports: app-local runs/<uuid>.json atomic snapshot and metadata-only .jsonl events; 0700/0600.
+- Output: 32 KiB/phase, 256 KiB/run, max 2,048 results; both streams drain beyond cap.
+- JSON string inputs masked; output remains sensitive. Inputs, credentials and unbounded output are never stored as request metadata.
+- UI polls at 1.2s; phase output appears after invocation, not byte streaming. No retention cleanup yet.

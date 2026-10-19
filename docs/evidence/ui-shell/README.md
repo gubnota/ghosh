@@ -32,6 +32,16 @@ Minimum macOS 14 execution and managed SSH route-loss acceptance remain pending.
   without an approval step; 109 ms, a single observation rather than a benchmark.
   Node3 Test also passed (1,389 ms). Both Terminals opened directly with input focused.
   Captures 26–28: 2026-10-19, original JPEG 2320×1560.
+- [29](29-run-targets.png): release 0.1.3 Run dialog with Debian, local machine
+  and node3 selected; the unrelated example node remains unselected.
+- [30](30-run-results.png): persisted successful `linux-facts` Check report,
+  including Debian stdout and phase status.
+- [31](31-run-local-node3.png): the same report scrolled to real Darwin arm64
+  local output and Linux x86-64 node3 output; all three targets exited 0.
+  Captures 29–31: 2026-10-19, original PNG 2320×1560. This run only reads facts.
+  One earlier UI connection attempt failed before execution; the later successful
+  report is the captured evidence. Independent native acceptance also passed on
+  each remote host. The original `1.ghosh` was reopened afterwards without edits.
 
 Manual system-SSH checks used existing verified host keys with StrictHostKeyChecking=yes,
 BatchMode=yes and bounded connect attempts. Those checks changed no remote files.
@@ -40,7 +50,8 @@ Captures 20–22 show the earlier approval UI, superseded in 0.1.2. They use the
 separate ghosh-ssh transport and native review service; both
 authenticate as vm with an explicitly selected existing file key and close without
 executing remote commands. Both match existing known-host records. Managed remote
-PTY acceptance is shown in 24–25. Persistent host enrollment, SFTP and facts remain pending.
+PTY acceptance is shown in 24–25. Persistent host enrollment and SFTP remain pending;
+read-only facts scenarios and their durable results are shown in 29–31.
 Managed Debian Vim wrote only `/tmp/ghosh-managed-pty-smoke-20261019`;
 no production configuration or software changed. Native local vi editing/save/exit
 and shell-screen restoration also passed.

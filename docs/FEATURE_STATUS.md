@@ -10,8 +10,8 @@ The approved operational plan remains in progress. Work is sequential.
 | SSH nodes and keys | Node CRUD, system/custom file keys, defaults, agent, encrypted key/passphrase, password implementation | Live password acceptance, agent identity picker, jumps, SSH-config import, SFTP |
 | SSH connection | Test/Terminal connect immediately; only required credentials prompt; changed known keys rejected | Persistent enrollment of newly observed host keys, route-loss recovery |
 | Terminal emulator | Real local and managed SSH PTYs, xterm, resize/split/search, bounded replay, cleanup | Richer session restoration/reconnect UI |
-| Playbooks | New/paste/example/edit/validate/save/remove; shell check/apply documents | Run/Stop, targets/variables, execution adapters, handlers, run reports/history |
-| Scripts | Shell/Python/Deno source editor and examples | Runtime preflight, execution, result bindings and secret inputs |
+| Playbooks | New/paste/example/edit/validate/save/remove; shell check/apply/verify, explicit targets, retries/handlers, Run/Stop and persistent phase reports | Remote agent/MCP execution integration, richer typed adapters |
+| Scripts | Shell/Python/Deno editor/examples and local/SSH execution with runtime checks | Result bindings, artifacts, secret inputs and configurable Deno permissions |
 | Existing server-first-run | In-place Ansible project link format/example | Real Ansible Runner integration and all existing entrypoint imports/target previews |
 | Certificates | Target workflow documented | Normal Certbot/Cloudflare renewal, selective certificate distribution, Nginx restart/verification |
 | Timers | Approved design | Durable enabled schedules, recent-workspace catch-up and run reconciliation |
@@ -22,7 +22,7 @@ The approved operational plan remains in progress. Work is sequential.
 | Recordings | Planned | Capture/edit/replay and result persistence |
 | 3D scenes | Requested scope recorded | Objects/rig/animation/camera controls and 9:16, 16:9, 1:1 video exports |
 | MCP / CLI | Core authorization infrastructure | Running adapters and integration acceptance |
-| Releases | Tag-only sequential macOS arm64/Linux x86_64 workflow and packaging scripts | Linux desktop acceptance, signing/notarization and completed-feature release evidence |
+| Releases | Tag-only macOS arm64 CI and native packaging scripts; Linux CI job preserved as comments per user | Linux CI checks failed on v0.1.2; repair/re-enable later, desktop acceptance, signing/notarization |
 
 No production certificate issuance, deployment, database migration, remote plugin
 installation or model download has been performed. Native SSH acceptance uses the

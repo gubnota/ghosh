@@ -65,10 +65,11 @@ Execution services below are future boundaries, not existing modules.
 - Core tests own persistence/schema/conflict/secret/policy behavior (see TASK_LOG.md for current results).
 - Shell tests own caller restrictions and early/bounded document queue and fresh-disk approval invalidation (see TASK_LOG.md for current results).
 - Native Keychain test is opt-in, creates a temporary item and cleans it up.
-- Browser fixtures own 24 UI/focus/reconciliation journeys; do not claim native effects.
+- Browser fixtures own 25 UI/focus/reconciliation journeys; do not claim native effects.
 - Shared Select owns themed menus, keyboard selection/typeahead and viewport positioning.
 - Platform adapters own legacy-secret availability; Linux fails closed, file keys stay separate.
-- Release tooling owns version guards, native packaging/checksums and sequential tag-only CI.
+- Release tooling owns version guards, native packaging/checksums and tag-only CI.
+  Linux CI is temporarily commented out per user; macOS arm64 remains enabled.
 - Interactive smoke owns real Finder/file-dialog/dirty/trust/restart behavior and UI layout.
 - Future ghosh-webview owns two-profile/one-window cookie and routing tests.
 - Future ghosh-mcp owns protocol/Inspector B3; core owns shared execution/policy fixtures.
@@ -77,5 +78,9 @@ Execution services below are future boundaries, not existing modules.
 ## Automation authoring boundary
 - Core automation owns bounded YAML/script validation; workspace/automation owns safe source paths and exact revision/digest writes.
 - Native automation exposes four typed local-shell operations; frontend owns draft/example presentation.
-- Catalog/validation/open remain inert; execution and interpreter adapters belong to the next slice.
+- Catalog/validation/open remain inert. Core runs owns portable task state transitions; it never resolves keys.
+- Native runs owns worker/target validation, revision checks, private reports and cancellation.
+- Local adapter owns process groups/pipes; SSH adapter owns non-PTY channels and uncertain disconnect outcomes.
+- Frontend owns target/input/credential presentation and phase report polling; no direct process or key access.
+- Ansible Runner remains a separate controller adapter, not native YAML translation.
 - SSH UI auto-consumes native tickets without human confirmation; transport owns key pinning and changed-host rejection.

@@ -27,7 +27,9 @@ keyboard-operated 3D scene workflow with animation and video export.
   keyboard-interactive, jumps and route-loss managed checks remain. Native release
   split sizing/Unicode passed on both; Debian Ctrl+C and Vim save/exit passed.
 - Slice 3 authoring: Playbooks/Scripts editors, examples, static validation and
-  revision-bound persistence implemented; execution/Ansible Runner/history pending.
+  revision-bound persistence implemented. Native Check/Apply/verify and scripts run
+  locally/SSH with targets, inputs, Stop and durable phase reports; Ansible Runner,
+  secret inputs, result bindings/artifacts and byte streaming remain pending.
 - Slices 4–8: pending; no production playbook/certificate operation has run.
 - 2026-10-19 user refinement: Test/Terminal connect without confirmation, allowing
   unknown hosts per connection while retaining changed-known-key rejection.
@@ -386,6 +388,8 @@ TTY, file fixtures in a dedicated temporary directory and on-demand read-only
 metrics/logs. Check screenshots for private data. Test artifact cleanup, queue caps,
 secret redaction and crashed-run recovery. Build macOS arm64 and Linux x86_64
 artifacts on their actual platforms; distinguish build success from feature parity.
+User update 2026-10-19: temporarily comment out Linux CI after its v0.1.2 check
+failure. Keep tag-only macOS CI enabled and preserve Linux configuration for later.
 README must show actual native screens and instructions for workspace lifecycle,
 key/node setup, terminals, script/scenario examples, importing server-first-run,
 certificates/timers, logs/metrics, ComfyUI and implemented browser/scene features.

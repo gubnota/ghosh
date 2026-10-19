@@ -354,3 +354,40 @@
   is in progress. Remote build/artifact success is not yet claimed.
 - Closed the two test-only SSH sessions and restored `/Users/vm/Documents/1.ghosh`
   in the app. Its files were not modified; restore-last again points to that workspace.
+
+## 2026-10-19 — Sequential local/SSH scenario execution
+
+- Implemented revision-bound Run/Stop and private durable Runs reports for native
+  Check/Apply scenarios and Shell/Python/Deno scripts. One run per workspace,
+  up to eight targets, authenticated before sequential execution. SSH starts
+  immediately; only required per-call credentials prompt. Original 1.ghosh untouched.
+- Check uses exit 0/10 for ok/drift; Apply checks, changes and verifies. Explicit
+  bounded retries, skip rules and deduplicated handlers are covered. Local process
+  groups are stopped; remote disconnect/timeouts become unknown and never replay.
+- Result output is bounded (32 KiB/phase, 256 KiB/run), control-filtered and literal
+  JSON input strings are masked. Reports exclude source/credentials/inputs, use
+  private atomic files and reconcile stale running records to unknown on restart.
+- Checks: formatting, Clippy, generated contract freshness, strict frontend build,
+  80 Rust tests and all 25 single-worker UI tests pass. Two opt-in tests remain
+  skipped in the standard suite. The local runtime test covers real Check/Apply,
+  verify, handler and repeat-run idempotence, plus bounded output and cancellation.
+- Opt-in native acceptance passed sequentially on debian.orb.local and node3:
+  file authentication, real PTY, resize/replay/ANSI/UTF-8, exit 7, both exec streams,
+  draining beyond output caps and saved Linux-facts scenario to persistent report.
+  Only read-only commands ran remotely; no installs or production file writes.
+- Built release 0.1.3 macOS arm64 app and archive; SHA-256 verification passed.
+  Native UI report `4f66d68b-d765-46d6-b877-27c2bc4cad27` succeeded on Debian,
+  local macOS and node3 with exit 0 each. An earlier UI connection attempt failed;
+  the later successful report and independent per-host acceptance are recorded.
+  Actual screenshots 29–31 are linked in README and the native evidence index.
+  Reopened the original `/Users/vm/Documents/1.ghosh` without changing its files.
+- v0.1.2 CI: macOS passed and uploaded its artifact; Linux failed at
+  scripts/check.sh before packaging (job 118097912909). User then requested
+  skipping Linux. Commented out its whole job, retained tag-only macOS CI and
+  documented the temporary suspension. Linux root-cause diagnosis is deferred.
+- Implementation committed as 30356ac; release 0.1.3 macOS archive contains the
+  current README and passed SHA-256 verification. CI configuration parses with
+  only macos-arm64 enabled; branch pushes remain excluded from its trigger.
+- Ansible Runner, certificate renewal/distribution, durable timers, monitoring,
+  ComfyUI installs/downloads, browser sessions/recordings and scene automation
+  remain pending. Result bindings and report-history cleanup also remain pending.

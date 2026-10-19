@@ -14,7 +14,7 @@
 - Real local PTY/emulator and manual SSH to both authorized targets pass native smoke.
 - Managed direct SSH authentication and PTYs connect immediately; native exact-key checks remain.
 - File keys, encrypted keys and SSH agent passed live tests; per-call password is implemented.
-- Playbook/Script authoring works; execution/runs, browsers, runtime scripting and MCP remain pending.
+- Native Playbook/Script local/SSH runs work; Ansible, browsers and MCP execution remain pending.
 
 ## Read first and navigate
 - Six memory files summarize actual behavior; keep them short and current.
@@ -103,7 +103,9 @@
 - Flat YAML/Ansible links and Shell/Python/Deno sources are revision-bound, at most 256 KiB each.
 - Invalid external sources open inert with validation issues; they cannot be saved through the editor.
 - Native YAML currently supports check/shell tasks and bounded handler references only.
-- Run/Stop, target forms, interpreter checks and durable reports are not connected.
+- Native Check/Apply/verify, handler/retry/skip rules, up to eight local/SSH targets and Stop work.
+- Shell/Python/Deno execute on installed runtimes; no runtime/dependency installation.
+- Durable bounded Runs update at phase completion; unknown outcomes never replay automatically.
 
 ## Trust, secrets and approval policy
 - Local schema 1/2 workspaces default approved; manual Pause survives reload, reopen approves again.
@@ -117,7 +119,8 @@
 - SecretValue is zeroized and has no Debug/Serialize implementation.
 - Core owns SecretStore; macOS shell implements it using security-framework.
 - Linux legacy SecretStore fails closed; SSH file storage remains separate.
-- Tag-only CI builds macOS arm64 then Linux x86_64; archives/checksums via scripts/build-release.sh.
+- Tag-only CI builds macOS arm64; Linux job temporarily commented out per user after v0.1.2 failure.
+- Archives/checksums via scripts/build-release.sh; Linux local packaging remains available.
 - Secret resolution requires an explicitly authorized trusted NativeService context.
 - Error envelopes use static messages; parser/OS input is not echoed to the UI.
 - Mandatory approvals include every B1 Approval=yes tool; incomplete explicit lists fail load.
@@ -125,8 +128,8 @@
 - Native approval inbox supports once/session grants, denial/revocation and bounded audit.
 - Exact bindings cover workspace/revision/native session, requester/tool/source/targets/route/identity.
 - Five-minute monotonic expiry; disk edits, trust changes and workspace mutations invalidate.
-- Only native services can request/consume grants; no execution service is connected yet.
-- Live jobs/grants/audit are memory-only; durable run history belongs to phase 8.
+- Only native services can request/consume agent grants; manual local UI runs use explicit Run.
+- Jobs/grants/audit are memory-only; automation reports persist separately in app-local runs/.
 - Remote/page/MCP output must always remain untrusted data, never instructions.
 
 ## Approved requirements and remaining services
@@ -144,7 +147,7 @@
 - Direct file keys, SSH agent and schema-2 per-call passwords share reviewed authentication.
 - Known hosts: user + OrbStack files, read-only; changed keys fail; unknown is per-connection opt-in.
 - Managed SSH PTYs passed input/resize/Unicode/exit/cleanup on both authorized hosts.
-- Persistent host enrollment, jumps, exec/SFTP and scenario execution remain pending.
+- SSH exec and native scenarios pass both authorized hosts; persistent enrollment, jumps/SFTP remain pending.
 - Base44 handoff: docs/base44/; ten real JPEG screenshots, brief, offline gallery and ZIP.
 - Original workspace opened without edits/trust; fixture used for conflict/node captures.
 - Live Base44 reference inspected via Browser; 33 captures and observed/placeholder

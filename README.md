@@ -6,9 +6,9 @@ a compact monospace layout, commands and keyboard-operated review dialogs.
 
 **Development status:** workspace persistence, node inventory editing, a file-based
 SSH key library, identity migration, jobs, approval infrastructure and real local
-PTY terminals, direct managed SSH terminals and Playbook/Script authoring are working.
+PTY terminals, direct managed SSH terminals and Playbook/Script authoring and execution are working.
 The approved [implementation plan](docs/IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md)
-is in progress. YAML scenario execution and the other service screens are still being implemented. Unavailable actions explain
+is in progress. Native check/apply scenarios and Shell/Python/Deno scripts run locally or over SSH. Ansible and the other service screens are still being implemented. Unavailable actions explain
 their status; prototype screenshots are never presented as working native features.
 
 The approved [operational workflow supplement](docs/IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
@@ -22,6 +22,12 @@ The remaining workflow sections describe planned work. See the current [feature 
 These are actual native app captures, not Base44 mockups. Screenshots show public
 metadata for a disposable identity or an explicitly selected existing key; no private
 key material is shown.
+
+![Run a scenario sequentially on selected SSH nodes and the local machine](docs/evidence/ui-shell/29-run-targets.png)
+
+![Saved successful scenario results with per-target output](docs/evidence/ui-shell/30-run-results.png)
+
+![Real local macOS and node3 Linux results in the same run](docs/evidence/ui-shell/31-run-local-node3.png)
 
 ![Playbook examples in the native app](docs/evidence/ui-shell/26-playbook-examples.jpg)
 
@@ -61,6 +67,8 @@ On Linux x86_64, the current build target is Ubuntu 24.04 with GTK 3,
 WebKitGTK 4.1, OpenSSL and the Tauri development dependencies listed in
 [the workflow](.github/workflows/ci.yml). Install `/bin/bash` for the local terminal.
 Linux is an early build target; desktop interaction acceptance is pending.
+Linux CI is temporarily disabled after the v0.1.2 checks failed. Its job remains
+commented out in the workflow; tagged builds currently produce macOS artifacts only.
 
 ```sh
 npm ci
@@ -144,7 +152,8 @@ the connection dialog asks for the passphrase without saving it. Never put priva
 | Inspect local workspace work and authorizations | Real jobs, approval inbox and revocable native grants; execution integration pending |
 | Troubleshoot locally or on a remote node | Real local and managed SSH PTYs, xterm emulator, split/search and optional manual system SSH |
 | Author a scenario or script | Playbooks/Scripts: New, paste source, examples, edit, validate, save and recoverable remove; YAML, Shell, Python and Deno |
-| Run native scenarios or the existing Ansible project | Execution, target selection, cancellation and history are pending; Ansible project links can already be saved |
+| Run native scenarios and scripts | Select up to eight local/SSH targets; Check/Apply/verify, handlers, Stop and persistent per-node results |
+| Run the existing Ansible project | Inert project links can be saved; real Ansible Runner execution remains pending |
 | Manage browser profiles, routes, certificates or ComfyUI | Planned native services; current placeholder screens do not execute operations |
 | Give an agent controlled MCP access | Planned, disabled by default; no running MCP server yet |
 
@@ -162,7 +171,7 @@ output replay, ANSI/UTF-8, exit status and cleanup. SSH-agent authentication and
 PTY also passed on node3 with a disposable agent and with an encrypted temporary
 copy of the authorized file key. The original key was unchanged. Password
 authentication is implemented but has not been exercised against a live target.
-Persistent host enrollment, jumps, SFTP, facts and plan/apply remain pending.
+Persistent host enrollment, jumps, SFTP and a dedicated facts service remain pending.
 The native release UI also passed managed split resizing to 21×48 on both nodes,
 Unicode paste and ANSI output; Debian passed Ctrl+C and Vim edit/save/exit.
 The 0.1.2 release UI passed immediate Test authentication on Debian and node3
@@ -189,8 +198,47 @@ supported task structure; Ansible links validate paths without reading or copyin
 project files. These operations do not execute code.
 
 Sources live in the configured `playbooks/` and `scripts/` folders and participate
-in workspace revision/conflict detection. Run/Stop, target/variable forms, real
-Ansible Runner integration and durable run reports are the next implementation slice.
+in workspace revision/conflict detection. Saving never executes a source.
+
+## Run and inspect results
+
+1. Open **Playbooks**, save **Inspect Linux node**, then choose **Run**. Select
+   **Check** and your Debian/node3 nodes (or **Local machine**); choose **Start check**.
+2. **Check** runs each declared check command: exit 0 means satisfied, exit 10
+   means drift; another exit fails that node. Check commands are executable code,
+   so use read-only commands when that is the intended behavior.
+3. **Apply** checks immediately before each change, runs the shell command only
+   for drift, then checks again. Failed verification stops the node. Explicit
+   retries recheck state; interrupted commands are never retried automatically.
+   `creates`/`unless`, `changed_when` and deduplicated successful-node handlers work.
+   A nonempty YAML `targets` list limits the node IDs selectable for execution.
+4. In **Scripts**, choose **Run** to execute Shell, Python 3 or Deno. The runtime
+   must already exist on the target; missing Python/Deno produces a run result.
+   Deno reports its version and runs without prompts, project config, lock writes
+   or dependency downloads, with only GHOSH_INPUT environment and hostname access.
+   Network/file/subprocess permissions and installation recipes are future work.
+5. Optional non-secret JSON object inputs arrive as the `GHOSH_INPUT` environment
+   variable. There are no result bindings, artifacts or secret-input broker yet.
+6. **Runs** shows saved phases, exit codes, bounded output and **Stop run**.
+   Targets execute sequentially; only one automation run is active. Cmd+K `run plan`
+   or `run apply` opens the first runnable native playbook's target form.
+
+SSH connections start without approval dialogs. Only a necessary password or key
+passphrase prompts, and neither is saved. Existing changed host keys still fail.
+Workspace edits/switch/close are blocked during execution; externally edited
+source is rejected before the next invocation. Stop reaps local process groups;
+remote stop, timeout or transport loss means **Outcome unknown** because closing
+an SSH channel cannot prove a remote process ended. Completed changes stay applied.
+A run left active after an app crash is displayed as unknown and never replayed.
+
+Reports live in the application-local `runs/` folder (0700, files 0600), scoped to
+workspace ID. The UI shows the latest 100; retention cleanup is not implemented.
+Results update after each command, rather than streaming every byte. Capture is
+32 KiB per phase and 256 KiB per report while both streams continue to drain.
+Literal string inputs are masked, but scripts must not print secrets: output is
+persisted and arbitrary secrets cannot be reliably detected. Review output before
+sharing. No production Ansible playbook, certificate, plugin or model operation
+has run as part of acceptance.
 
 ## Test a node connection
 
@@ -325,7 +373,8 @@ Generated TypeScript and JSON Schemas are checked in. Regenerate with
 projection; runtime validation also enforces cross-file references and policy.
 
 The optional remote integration test authenticates, verifies existing host trust,
-checks review replay rejection, and closes without executing remote commands. It uses
+checks review replay rejection, exercises a real PTY and bounded command execution,
+then executes the saved Linux facts scenario and checks its persistent report. It uses
 a disposable workspace and your existing `~/.ssh/id_ed25519` (override with
 `GHOSH_SMOKE_KEY`). Run only when authorized to access both named test hosts:
 
@@ -343,15 +392,18 @@ It needs an unlocked user Keychain outside a filesystem-only sandbox. The defaul
 suite skips it so CI does not open permission prompts. Local verification and
 native smoke evidence are recorded in [the task log](docs/TASK_LOG.md).
 CI runs **only when a `v*` tag is pushed**. It verifies the tag against all three
-version manifests, then checks/builds macOS arm64 followed by Linux x86_64.
+version manifests, then checks/builds macOS arm64. The Linux job is temporarily
+commented out at the user's request; it does not run or upload artifacts.
 Branch pushes and pull requests do not start it. Windows remains deferred.
 Runner labels follow the [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 
 ## Tagged build artifacts
 
 Open a completed tagged run in [GitHub Actions](https://github.com/gubnota/ghosh/actions).
-The artifacts contain a macOS `.app` archive or a Linux `.deb` and binary archive,
-plus `SHA256SUMS` and license notices. These are unsigned development builds;
+Current artifacts contain a macOS `.app` archive, `SHA256SUMS` and license notices.
+The local packaging script also supports Linux `.deb` and binary archives, but
+Linux CI is disabled and no successful Linux artifact is claimed.
+These are unsigned development builds;
 macOS signing/notarization and Linux desktop acceptance remain pending. Linux
 archives require system GTK/WebKitGTK libraries and are not standalone static builds.
 The `.deb` declares runtime dependencies; install it on Ubuntu 24.04 with
@@ -362,25 +414,27 @@ To reproduce packaging on the corresponding native architecture:
 ```sh
 npm ci
 bash scripts/check.sh
-bash scripts/build-release.sh v0.1.2
+bash scripts/build-release.sh v0.1.3
 ```
 
 Output is under ignored `artifacts/`. Increment package.json (and lockfile),
 Cargo workspace/package lock versions and tauri.conf.json together before a new tag.
 Pushing a version tag starts the release checks; artifacts are uploaded only after
-that platform passes. The Linux job also checks headless native startup.
+that platform passes. The commented Linux job includes headless native startup
+checks for when Linux builds are re-enabled.
 
 ## Remote JavaScript and agents
 
 The SSH design does not require a persistent precompiled Ghosh server agent.
-Deno is a suitable optional runtime for future remote JS/TS jobs, invoked over
-authenticated SSH with a pinned runtime, reviewed dependencies, bounded output
-and explicit permissions. It will not be installed silently on nodes.
+Deno scripts now run locally or over authenticated SSH using an already installed
+runtime; its version appears in the phase output. Ghosh uses bounded output and
+explicit permissions and does not install Deno on nodes.
 No `--allow-all` default: file/network/environment access must be scoped;
 subprocess and FFI permission need separate review because they escape those limits.
 Static imports also need pinned/vendored dependency controls. See
 [Deno’s security model](https://docs.deno.com/runtime/fundamentals/security/).
-Remote JS execution and the separate local embedded scripting API are still planned.
+Dependency acquisition, configurable script permissions and the separate local
+embedded scripting API remain planned.
 
 ## Navigate
 

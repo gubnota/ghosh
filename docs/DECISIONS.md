@@ -324,3 +324,36 @@ or opens a linked Ansible project. Script syntax/runtime checks remain pending.
 Related files: src/features/nodes/ConnectionTest.tsx,
 crates/ghosh-core/src/automation.rs, crates/ghosh-core/src/workspace/automation.rs,
 src/features/automation, docs/FEATURE_STATUS.md.
+
+
+# ADR-0021: Sequential native execution and durable bounded results
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: Authoring alone cannot operate nodes; the approved workflow requires local
+and SSH execution, cancellation, idempotence and inspectable outcomes.
+Decision: Share a portable check/apply/verify engine through an Executor port.
+Native services resolve pinned SSH tickets, recheck exact source/revision before
+invocation and persist bounded private snapshots plus metadata events. Local
+process groups are reaped; SSH interruption is unknown, with no automatic replay.
+Run authorizes manual local UI execution without a second SSH confirmation.
+Consequences: Native scenarios and installed Shell/Python/Deno runtimes work.
+Ansible remains disabled until its real controller adapter is implemented. Reports
+are phase based, sensitive, local-only and lack retention cleanup. No agent daemon
+or runtime install is needed; Deno permissions/dependencies remain deliberately explicit.
+Related files: crates/ghosh-core/src/runs.rs, crates/ghosh-ssh/src/exec.rs,
+src-tauri/src/services/runs.rs, src-tauri/src/services/local_exec.rs,
+src/features/automation/RunDialog.tsx, src/features/automation/RunsView.tsx.
+
+# ADR-0022: Temporarily suspend Linux CI
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: v0.1.2 macOS checks/build/artifact passed; Linux failed in scripts/check.sh
+before packaging. User explicitly requested skipping Linux and commenting it out.
+Decision: Comment out the complete Linux job; keep tag-only macOS arm64 CI enabled.
+Consequences: No Linux artifacts are promised. Preserve the job and local packaging
+support for later diagnosis and re-enablement; do not conceal the failed checks.
+Related files: .github/workflows/ci.yml, README.md, docs/FEATURE_STATUS.md.
