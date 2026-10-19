@@ -348,3 +348,9 @@
   during common checks before packaging (exit 101). Public diagnostics do not give
   the Rust error; detailed logs require working GitHub authorization (current token
   returned HTTP 401). Linux artifact/desktop acceptance is not yet claimed.
+- Release script repackaged 0.1.2; local macOS archive SHA-256 verification passed.
+  Published main 7b8a81e and annotated v0.1.2; tag-triggered
+  [CI run 39260833453](https://github.com/gubnota/ghosh/actions/runs/39260833453)
+  is in progress. Remote build/artifact success is not yet claimed.
+- Closed the two test-only SSH sessions and restored `/Users/vm/Documents/1.ghosh`
+  in the app. Its files were not modified; restore-last again points to that workspace.
