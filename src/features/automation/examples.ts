@@ -33,7 +33,7 @@ project: /Users/vm/Documents/petProjects/server-first-run
 playbook: ssh_playbook.yml
 inventory: hosts.ini
 ` } },
-  { label: "Shell · system report", description: "A shell script for a local or remote node. Execution needs a separate run review.", document: {
+  { label: "Shell · system report", description: "A shell script for a local or remote node. Choose targets and execute; results are saved in Runs.", document: {
     id: "system-report", kind: "shell", source: `#!/bin/sh
 set -eu
 printf 'System report\\n'

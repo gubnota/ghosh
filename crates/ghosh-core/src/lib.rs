@@ -3,6 +3,7 @@ pub mod automation;
 pub mod contracts;
 pub mod operations;
 pub mod policy;
+pub mod runs;
 pub mod secrets;
 pub mod ssh;
 pub mod ssh_keys;

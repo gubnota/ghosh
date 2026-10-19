@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { JobKind } from "../../generated/contracts";
 import type { Operations } from "../../app/useOperations";
 
-const labels: Record<JobKind, string> = { node_connect: "Test SSH connection", inventory_save: "Save node inventory", workspace_open: "Open workspace", workspace_create: "Create workspace", workspace_save: "Save workspace", workspace_reload: "Reload workspace", workspace_trust: "Change workspace trust" };
+const labels: Record<JobKind, string> = { automation_run: "Run automation", node_connect: "Test SSH connection", inventory_save: "Save node inventory", workspace_open: "Open workspace", workspace_create: "Create workspace", workspace_save: "Save workspace", workspace_reload: "Reload workspace", workspace_trust: "Change workspace trust" };
 export const readable = (value: string) => value.replaceAll("_", " ");
 export const timestamp = (value: number) => new Date(value).toLocaleString();
 export function JobsView({ operations }: { operations: Operations }) {

@@ -16,6 +16,8 @@ use std::{
 use tauri::{AppHandle, Emitter};
 mod automation;
 mod history;
+mod local_exec;
+mod runs;
 mod ssh;
 use history::WorkspaceHistory;
 
@@ -50,6 +52,7 @@ impl DocumentOpenQueue {
 }
 pub struct Services {
     ssh_reviews: Mutex<Vec<ssh::Review>>,
+    runs: Mutex<runs::RunRegistry>,
     pub terminals: ghosh_term::Terminals,
     pub jobs: Jobs,
     approvals: Mutex<Approvals>,
@@ -76,6 +79,7 @@ impl Services {
         let keys = FileKeyRegistry::open(&data_dir.canonicalize()?.join("ssh"));
         Ok(Self {
             ssh_reviews: Mutex::new(Vec::new()),
+            runs: Mutex::new(runs::RunRegistry::default()),
             terminals: ghosh_term::Terminals::default(),
             jobs: Jobs::default(),
             approvals: Mutex::new(Approvals::default()),
@@ -90,6 +94,9 @@ impl Services {
     // Caller holds active first. Rotate even when the attempted mutation fails:
     // an in-flight review cannot become valid again after trust/reload transitions.
     fn invalidate_reviews(&self, active: &mut Option<Active>) -> Result<()> {
+        if self.run_active()? {
+            return Err(AppError::new(ErrorCode::Busy));
+        }
         if let Some(active) = active {
             active.context.session_id = uuid::Uuid::new_v4().to_string();
         }

@@ -4,6 +4,7 @@ use ghosh_core::{
     automation::*,
     contracts::*,
     operations::{JobKind, OperationsSnapshot},
+    runs::{RunReport, RunRequest},
     ssh::*,
     ssh_keys::*,
     terminal::*,
@@ -37,6 +38,36 @@ async fn run<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) 
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|_| AppError::new(ErrorCode::Internal))?
+}
+#[tauri::command]
+pub async fn run_start(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: RunRequest,
+) -> Result<RunReport> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.run_start(request)).await
+}
+#[tauri::command]
+pub async fn runs_list(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: RevisionRequest,
+) -> Result<Vec<RunReport>> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.runs_list(request)).await
+}
+#[tauri::command]
+pub async fn run_stop(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    id: String,
+) -> Result<()> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.run_stop(id)).await
 }
 #[tauri::command]
 pub async fn automations_list(

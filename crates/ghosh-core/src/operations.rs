@@ -21,6 +21,7 @@ pub enum JobKind {
     WorkspaceTrust,
     InventorySave,
     NodeConnect,
+    AutomationRun,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]

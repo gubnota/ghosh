@@ -20,6 +20,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::run_start,
+            commands::runs_list,
+            commands::run_stop,
             commands::automations_list,
             commands::automation_read,
             commands::automation_preview,

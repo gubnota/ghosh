@@ -69,6 +69,7 @@ export function commandReason(command: Command, context: { desktop: boolean; wor
   if (command.id === "workspace.close") return context.desktop ? null : "Requires the Ghosh desktop app.";
   if (command.id === "node.test" || command.id === "node.terminal") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload this workspace before testing." : !context.trusted ? "Workspace operations are paused. Resume them in Overview." : null;
   if (["node.add", "node.edit"].includes(command.id)) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing inventory.";
+  if (command.id === "run.plan" || command.id === "run.apply") return !context.desktop ? "Requires the Ghosh desktop app." : !context.editable ? "Reload the workspace first." : !context.trusted ? "Resume workspace operations in Overview." : null;
   if (command.id.startsWith("playbook.") || command.id.startsWith("script.")) return !context.desktop ? "Requires the Ghosh desktop app." : context.editable ? null : "Reload this workspace before editing automation.";
   return `${command.group} service is not available in this build.`;
 }

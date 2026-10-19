@@ -1,3 +1,4 @@
+import type { RunReport, RunRequest } from "../generated/contracts";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { NodeConnectionRequest, NodeConnectionPreview, NodeConnectionCommit, NodeConnectionResult, NodeTerminalRequest } from "../generated/contracts";
@@ -7,6 +8,9 @@ import type { Node, NodeMutationRequest, NodeCommitRequest, NodeChangePreview, A
 import type { AutomationSummary, AutomationDocument, AutomationReadRequest, AutomationMutation, AutomationPreview, AutomationCommit } from "../generated/contracts";
 export const desktop = isTauri();
 export const api = {
+  runStart: (request: RunRequest) => invoke<RunReport>("run_start", { request }),
+  runs: (request: RevisionRequest) => invoke<RunReport[]>("runs_list", { request }),
+  runStop: (id: string) => invoke<void>("run_stop", { id }),
   automations: (request: RevisionRequest) => invoke<AutomationSummary[]>("automations_list", { request }),
   automationRead: (request: AutomationReadRequest) => invoke<AutomationDocument>("automation_read", { request }),
   automationPreview: (request: AutomationMutation) => invoke<AutomationPreview>("automation_preview", { request }),

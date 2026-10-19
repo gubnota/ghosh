@@ -214,7 +214,7 @@ impl Services {
         job.finish(&result)?;
         result
     }
-    fn with_connection<T>(
+    pub(super) fn with_connection<T>(
         &self,
         mut request: NodeConnectionCommit,
         cancel: &Cancellation,
@@ -294,6 +294,26 @@ impl Services {
         }
         cancel.check()?;
         effect(connection, node)
+    }
+    pub(super) fn validate_run_ticket(
+        &self,
+        connection: &NodeConnectionCommit,
+        context: &RevisionRequest,
+        node: &str,
+    ) -> Result<()> {
+        let reviews = self.ssh_reviews.lock().map_err(poisoned)?;
+        let review = reviews
+            .iter()
+            .find(|review| review.ticket == connection.ticket)
+            .ok_or_else(denied)?;
+        if review.request.context.workspace_id != context.workspace_id
+            || review.request.context.revision != context.revision
+            || review.request.node_id != node
+            || review.created.elapsed() >= Duration::from_secs(120)
+        {
+            return Err(denied());
+        }
+        Ok(())
     }
     fn validate_connection_review(&self, active: &Active, review: &Review) -> Result<Node> {
         let keys = self.keys()?;
@@ -565,6 +585,90 @@ mod tests {
             eprintln!(
                 "{id}: native remote PTY, resize, replay, ANSI/UTF8, exit 7 and cleanup passed"
             );
+            let snapshot = service.snapshot().unwrap().unwrap();
+            let preview = service
+                .connection_preview(NodeConnectionRequest {
+                    context: RevisionRequest {
+                        workspace_id: snapshot.id,
+                        revision: snapshot.revision,
+                    },
+                    node_id: id.into(),
+                })
+                .unwrap();
+            service.with_connection(NodeConnectionCommit { ticket: preview.ticket, allow_unknown: false, credential: credential.clone() }, &Cancellation::default(), |mut connection, _| {
+                use ghosh_core::runs::*;
+                let out = connection.execute("printf 'EXEC_SMOKE\\n'; printf 'stderr-smoke\\n' >&2; yes x | head -c 131072; yes e | head -c 131072 >&2; exit 7\n", 10, &Cancellation::default())?;
+                assert_eq!(out.end, ExecEnd::Exited(7)); assert!(out.truncated); assert_eq!(out.output.len(), OUTPUT_LIMIT);
+                assert!(String::from_utf8_lossy(&out.output).contains("EXEC_SMOKE"));
+                Ok(())
+            }).unwrap();
+            eprintln!("{id}: native exec drains both streams, bounds output and preserves exit 7");
         }
+        use ghosh_core::{automation::*, runs::*, workspace::automation::*};
+        let service = Arc::new(service);
+        let snapshot = service.snapshot().unwrap().unwrap();
+        let mutation = AutomationMutation { context: RevisionRequest { workspace_id: snapshot.id, revision: snapshot.revision }, document: AutomationDocument { id: "authorized-facts".into(), kind: AutomationKind::Playbook, source: "schema: 1\nname: Authorized read-only facts\ntasks:\n  - name: Facts\n    check:\n      command: 'uname -s; uptime; printf exec-stderr >&2'\n    shell:\n      command: 'false'\n    timeout_s: 15\n".into() }, replace: false, remove: false };
+        let preview = service.automation_preview(mutation.clone()).unwrap();
+        let snapshot = service
+            .automation_commit(AutomationCommit {
+                mutation,
+                digest: preview.digest,
+            })
+            .unwrap();
+        let context = RevisionRequest {
+            workspace_id: snapshot.id,
+            revision: snapshot.revision,
+        };
+        let targets = nodes
+            .iter()
+            .map(|(id, _)| {
+                let preview = service
+                    .connection_preview(NodeConnectionRequest {
+                        context: context.clone(),
+                        node_id: (*id).into(),
+                    })
+                    .unwrap();
+                RunTarget {
+                    node_id: (*id).into(),
+                    connection: Some(NodeConnectionCommit {
+                        ticket: preview.ticket,
+                        allow_unknown: false,
+                        credential: credential.clone(),
+                    }),
+                }
+            })
+            .collect();
+        let initial = service
+            .run_start(RunRequest {
+                automation: AutomationReadRequest {
+                    context: context.clone(),
+                    id: "authorized-facts".into(),
+                    kind: AutomationKind::Playbook,
+                },
+                mode: RunMode::Check,
+                targets,
+                input: "{}".into(),
+            })
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(45);
+        while service.run_active().unwrap() {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let report = service
+            .runs_list(context)
+            .unwrap()
+            .into_iter()
+            .find(|report| report.id == initial.id)
+            .unwrap();
+        assert_eq!(report.state, RunState::Succeeded, "{:?}", report.results);
+        assert_eq!(report.results.len(), nodes.len());
+        assert!(report.results.iter().all(|result| result.phase == "check"
+            && result.output.contains("Linux")
+            && result.output.contains("exec-stderr")));
+        eprintln!(
+            "saved native scenario → SSH → bounded persisted report passed for {} node(s)",
+            nodes.len()
+        );
     }
 }

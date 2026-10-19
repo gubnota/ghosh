@@ -20,6 +20,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod exec;
+
 const TIMEOUT: Duration = Duration::from_secs(5);
 static RESOLVERS: AtomicUsize = AtomicUsize::new(0);
 static AGENT_WORKERS: AtomicUsize = AtomicUsize::new(0);

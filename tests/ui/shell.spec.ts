@@ -12,6 +12,7 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
       window.fixtureTerminalAck = [];
       window.fixtureTerminalCount = 0;
       window.fixtureAutomations = [];
+      window.fixtureRuns = [];
       window.fixtureKeys = {revision:'keys-1',default_key:null,keys:[]};
       window.fixtureWorkspace = { id: 'fixture', name: 'Test fleet', path: '/tmp/Test.ghosh', revision: 'r1', schema: 1, read_only: false, trusted: ${trusted}, external_changed: false, notices: [], nodes: [
         {id:'edge1',host:'192.0.2.1',port:22,user:'admin',labels:['web']}, {id:'db1',host:'192.0.2.2',port:22,user:'deploy',labels:['database']}
@@ -21,6 +22,9 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
       window.fixtureOperations = { jobs: { sequence: 1, jobs: [{id:'job-1',kind:'workspace_open',state:'succeeded',cancellable:false,started_at:Date.now(),finished_at:Date.now(),error:null,stages:['started','completed']}] }, approvals: { sequence: 1, requests: [], audit: [] } };
       mockIPC(async (cmd, args) => {
         window.fixtureCalls.push(cmd);
+        if (cmd === 'runs_list') return structuredClone(window.fixtureRuns);
+        if (cmd === 'run_start') {const request=args.request;const report={id:'run-fixture',job_id:'execution-job',workspace_id:'fixture',revision:request.automation.context.revision,automation_id:request.automation.id,kind:request.automation.kind,mode:request.mode,targets:request.targets.map(target=>target.node_id),state:'running',started_at:Date.now(),finished_at:null,results:[],message:'Targets execute sequentially.'};window.fixtureRunRequest=structuredClone(request);window.fixtureRuns=[report];window.fixtureOperations.jobs.jobs.push({id:'execution-job',kind:'automation_run',state:'running',cancellable:true,started_at:Date.now(),finished_at:null,error:null,stages:['started']});return structuredClone(report);}
+        if (cmd === 'run_stop') {window.fixtureRuns[0].state='outcome_unknown';window.fixtureRuns[0].message='Inspect the node before retrying.';window.fixtureRuns[0].results=[{node_id:'edge1',name:'Ensure',phase:'apply',state:'outcome_unknown',output:'very-long-output-'.repeat(120),exit_code:null,truncated:false}];window.fixtureOperations.jobs.jobs.find(job=>job.id==='execution-job').state='cancelled';return null;}
         if (cmd === 'node_connection_preview') return {ticket:'review-fixture',node_id:args.request.node_id,host:'192.0.2.1',port:22,user:'admin',identity:{source:'node',key_id:'fixture-key',public:{algorithm:'ED25519',fingerprint:'SHA256:identity-fixture'},status:'available',registry_revision:'keys-1'},host_key:{algorithm:'ED25519',fingerprint:'SHA256:host-fixture',trust:${unknown}?'unknown':'known'},credential_prompt:${credential}?'Key passphrase':null};
         if (cmd === 'node_connection_test') {window.fixtureAuthentication = args.request;return {node_id:'edge1',host_key:{algorithm:'ED25519',fingerprint:'SHA256:host-fixture',trust:'known'},elapsed_ms:42};}
         if (cmd === 'terminal_open_node') {window.fixtureAuthentication = args.request.connection;return {id:'remote-fixture-'+(++window.fixtureTerminalCount),target:'edge1 · admin@192.0.2.1:22',shell:'SSH login shell',cwd:'~'};}
@@ -109,7 +113,7 @@ test("commands trap focus, restore invoker and refuse unavailable/unknown action
   await expect(page.getByRole("combobox")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("combobox")).toBeFocused();
-  await page.getByRole("combobox").fill("run apply");
+  await page.getByRole("combobox").fill("certificate renew");
   await page.keyboard.press("Enter");
   await expect(popup).toBeVisible();
   await expect(popup.getByRole("status")).toContainText("not available");
@@ -700,4 +704,30 @@ test("inventory terminal opens directly once without approval", async ({ page })
   await expect(page.getByRole("tab", { name: "Terminal", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".xterm-helper-textarea")).toBeFocused();
   expect(await page.evaluate(() => (window as any).fixtureTerminalCount)).toBe(1);
+});
+
+test("saved scenario runs on explicit targets without SSH confirmation and can stop", async ({ page }) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    (window as any).fixtureAutomations = [{ id: "facts", kind: "playbook", source: "schema: 1" }];
+  });
+  await command(page, "run plan");
+  const dialog = page.getByRole("dialog", { name: /^Run / });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Mode", { exact: true })).toContainText("Check");
+  await dialog.getByRole("checkbox", { name: /db1/ }).check();
+  await dialog.getByRole("button", { name: "Start check", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop run", exact: true })).toBeVisible();
+  const request = await page.evaluate(() => (window as any).fixtureRunRequest);
+  expect(request.targets.map((target: any) => target.node_id)).toEqual(["edge1", "db1"]);
+  expect(request.targets.every((target: any) => target.connection.allow_unknown === true)).toBeTruthy();
+  expect(request.mode).toBe("check");
+  await page.getByRole("button", { name: "Stop run", exact: true }).click();
+  await expect(page.getByText("outcome unknown", { exact: true }).first()).toBeVisible();
+  await page.setViewportSize({ width: 460, height: 700 });
+  await page.getByText("1 task phase(s) · Results").click();
+  await expect(page.locator(".run-results pre")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });
