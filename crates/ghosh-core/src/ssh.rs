@@ -30,16 +30,33 @@ pub struct NodeConnectionPreview {
     pub user: String,
     pub identity: IdentityPreview,
     pub host_key: HostKeyPreview,
+    pub credential_prompt: Option<String>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct NodeConnectionCommit {
     pub ticket: String,
     pub allow_unknown: bool,
+    pub credential: Option<String>,
+}
+#[derive(Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct NodeTerminalRequest {
+    pub connection: NodeConnectionCommit,
+    pub dimensions: crate::terminal::TerminalSize,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct NodeConnectionResult {
     pub node_id: String,
     pub host_key: HostKeyPreview,
     pub elapsed_ms: u32,
+}
+
+impl Drop for NodeConnectionCommit {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        if let Some(value) = &mut self.credential {
+            value.zeroize();
+        }
+    }
 }

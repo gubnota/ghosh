@@ -265,7 +265,8 @@ impl Node {
                 return Err(invalid());
             }
             AuthMethod::Password
-                if self.auth.password_ref.is_none() || self.auth.key_ref.is_some() =>
+                if (self.schema == 1 && self.auth.password_ref.is_none())
+                    || self.auth.key_ref.is_some() =>
             {
                 return Err(invalid());
             }

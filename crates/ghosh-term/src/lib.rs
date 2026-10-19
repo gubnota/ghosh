@@ -21,9 +21,7 @@ fn failure(_: impl std::fmt::Display) -> AppError {
     AppError::new(ErrorCode::Internal)
 }
 fn size(size: TerminalSize) -> Result<PtySize> {
-    if !(2..=500).contains(&size.rows) || !(2..=1000).contains(&size.cols) {
-        return Err(AppError::new(ErrorCode::InvalidDocument));
-    }
+    let size = size.validate()?;
     Ok(PtySize {
         rows: size.rows,
         cols: size.cols,
@@ -31,18 +29,15 @@ fn size(size: TerminalSize) -> Result<PtySize> {
         pixel_height: 0,
     })
 }
-struct Session {
+struct LocalPty {
     master: Box<dyn MasterPty + Send>,
     child: Box<dyn Child + Send + Sync>,
     input: SyncSender<Vec<u8>>,
     output: Receiver<Vec<u8>>,
-    pending: Option<TerminalPacket>,
-    sequence: u32,
-    acknowledged: u32,
     eof: bool,
     write_failed: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
-impl Session {
+impl LocalPty {
     fn stop(&mut self) {
         // try_wait caches a reaped status. Never signal a pid after reaping it.
         if self.child.try_wait().ok().flatten().is_some() {
@@ -86,12 +81,45 @@ impl Session {
         let _ = self.child.wait();
     }
 }
-impl Drop for Session {
+impl Drop for LocalPty {
     fn drop(&mut self) {
         self.stop();
     }
 }
 
+impl Pty for LocalPty {
+    fn input(&mut self, bytes: Vec<u8>) -> Result<()> {
+        self.input
+            .try_send(bytes)
+            .map_err(|_| AppError::new(ErrorCode::Capacity))
+    }
+    fn resize(&mut self, dimensions: TerminalSize) -> Result<()> {
+        self.master.resize(size(dimensions)?).map_err(failure)
+    }
+    fn poll(&mut self) -> Result<PtyRead> {
+        let bytes = match self.output.try_recv() {
+            Ok(bytes) => bytes,
+            Err(TryRecvError::Empty) => Vec::new(),
+            Err(TryRecvError::Disconnected) => {
+                self.eof = true;
+                Vec::new()
+            }
+        };
+        let exit = self.child.try_wait().map_err(failure)?;
+        Ok(PtyRead {
+            bytes,
+            exited: exit.is_some() && self.eof,
+            exit_code: exit.map(|value| value.exit_code()),
+            failed: self.write_failed.load(std::sync::atomic::Ordering::Acquire),
+        })
+    }
+}
+struct Session {
+    pty: Box<dyn Pty>,
+    pending: Option<TerminalPacket>,
+    sequence: u32,
+    acknowledged: u32,
+}
 #[derive(Default)]
 pub struct Terminals {
     sessions: Mutex<HashMap<String, Session>>,
@@ -172,19 +200,50 @@ impl Terminals {
                 }
             }
         });
-        let id = uuid::Uuid::new_v4().to_string();
-        sessions.insert(
-            id.clone(),
-            Session {
+        Self::insert(
+            &mut sessions,
+            Box::new(LocalPty {
                 master: pair.master,
                 child,
                 input,
                 output,
+                eof: false,
+                write_failed,
+            }),
+            target,
+            shell,
+            cwd,
+        )
+    }
+    /// Inject a native-owned adapter; no transport-specific dependencies here.
+    pub fn attach(
+        &self,
+        pty: Box<dyn Pty>,
+        target: String,
+        shell: String,
+        cwd: String,
+    ) -> Result<TerminalSession> {
+        let mut sessions = self.sessions.lock().map_err(failure)?;
+        if sessions.len() >= MAX_SESSIONS {
+            return Err(AppError::new(ErrorCode::Capacity));
+        }
+        Self::insert(&mut sessions, pty, target, shell, cwd)
+    }
+    fn insert(
+        sessions: &mut HashMap<String, Session>,
+        pty: Box<dyn Pty>,
+        target: String,
+        shell: String,
+        cwd: String,
+    ) -> Result<TerminalSession> {
+        let id = uuid::Uuid::new_v4().to_string();
+        sessions.insert(
+            id.clone(),
+            Session {
+                pty,
                 pending: None,
                 sequence: 0,
                 acknowledged: 0,
-                eof: false,
-                write_failed,
             },
         );
         Ok(TerminalSession {
@@ -198,24 +257,21 @@ impl Terminals {
         if bytes.is_empty() || bytes.len() > CHUNK {
             return Err(AppError::new(ErrorCode::InvalidDocument));
         }
-        let sessions = self.sessions.lock().map_err(failure)?;
-        let session = sessions
-            .get(id)
-            .ok_or_else(|| AppError::new(ErrorCode::Denied))?;
-        session
-            .input
-            .try_send(bytes)
-            .map_err(|_| AppError::new(ErrorCode::Capacity))
+        let mut sessions = self.sessions.lock().map_err(failure)?;
+        sessions
+            .get_mut(id)
+            .ok_or_else(|| AppError::new(ErrorCode::Denied))?
+            .pty
+            .input(bytes)
     }
     pub fn resize(&self, id: &str, dimensions: TerminalSize) -> Result<()> {
-        let dimensions = size(dimensions)?;
-        let sessions = self.sessions.lock().map_err(failure)?;
+        dimensions.validate()?;
+        let mut sessions = self.sessions.lock().map_err(failure)?;
         sessions
-            .get(id)
+            .get_mut(id)
             .ok_or_else(|| AppError::new(ErrorCode::Denied))?
-            .master
+            .pty
             .resize(dimensions)
-            .map_err(failure)
     }
     pub fn poll(&self, id: &str, ack: u32) -> Result<TerminalPacket> {
         let mut sessions = self.sessions.lock().map_err(failure)?;
@@ -236,19 +292,12 @@ impl Terminals {
         if let Some(packet) = &session.pending {
             return Ok(packet.clone());
         }
-        let bytes = match session.output.try_recv() {
-            Ok(bytes) => bytes,
-            Err(TryRecvError::Empty) => Vec::new(),
-            Err(TryRecvError::Disconnected) => {
-                session.eof = true;
-                Vec::new()
-            }
-        };
-        let exit = session.child.try_wait().map_err(failure)?;
-        let failed = session
-            .write_failed
-            .load(std::sync::atomic::Ordering::Acquire);
-        let exited = exit.is_some() && session.eof;
+        let PtyRead {
+            bytes,
+            exited,
+            exit_code,
+            failed,
+        } = session.pty.poll()?;
         if !bytes.is_empty() || exited || failed {
             session.sequence = session
                 .sequence
@@ -258,7 +307,7 @@ impl Terminals {
                 sequence: session.sequence,
                 bytes,
                 exited,
-                exit_code: exit.map(|value| value.exit_code()),
+                exit_code,
                 failed,
             };
             session.pending = Some(packet.clone());

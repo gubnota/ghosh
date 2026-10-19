@@ -23,6 +23,7 @@ fn main() {
         HostKeyPreview::decl(),
         NodeConnectionPreview::decl(),
         NodeConnectionCommit::decl(),
+        NodeTerminalRequest::decl(),
         NodeConnectionResult::decl(),
         TerminalSize::decl(),
         TerminalSession::decl(),

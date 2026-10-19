@@ -16,7 +16,19 @@ RunPod ComfyUI environments; automate browser sessions and save their results.
 Restore workspace state without repeated trust prompts. Provide a subsequent
 keyboard-operated 3D scene workflow with animation and video export.
 
-## Existing behavior
+## Progress
+
+- Slice 1: implemented and committed as 73000b3; lifecycle/history/default approval,
+  clickable commands and bracket shortcuts pass regression checks.
+- Slice 2, direct terminal journey: implemented. Test/open share reviewed file,
+  agent and per-call password authentication; encrypted files unlock per call.
+  Managed PTYs passed Debian OrbStack and node3; agent/encrypted-key PTYs passed
+  node3. Live password, persistent host enrollment, agent identity choice,
+  keyboard-interactive, jumps and route-loss managed checks remain. Native release
+  split sizing/Unicode passed on both; Debian Ctrl+C and Vim save/exit passed.
+- Slices 3–8: pending; no production playbook/certificate operation has run.
+
+## Baseline behavior before this supplement
 
 - Real local xterm/PTY, node editing, a file-key registry and limited reviewed SSH
   login tests work. Managed remote PTYs and execution services do not exist yet.

@@ -1,6 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { NodeConnectionRequest, NodeConnectionPreview, NodeConnectionCommit, NodeConnectionResult } from "../generated/contracts";
+import type { NodeConnectionRequest, NodeConnectionPreview, NodeConnectionCommit, NodeConnectionResult, NodeTerminalRequest } from "../generated/contracts";
 import type { TerminalSession, TerminalPacket, TerminalSize } from "../generated/contracts";
 import type { KeyGenerateRequest, KeyRelinkRequest, WorkspaceKeyRequest, WorkspaceKeyPreview, WorkspaceKeyCommit, NodeIdentityRequest, IdentityPreview, KeysSnapshot, KeyImportRequest, KeyImportPreview, KeyCommitRequest, KeyRegistryRequest } from "../generated/contracts";
 import type { Node, NodeMutationRequest, NodeCommitRequest, NodeChangePreview, AppError, ApprovalDecisionRequest, OperationsSnapshot, CreateRequest, RecentWorkspace, RenameRequest, RevisionRequest, TrustRequest, WorkspaceEvent, WorkspaceSnapshot } from "../generated/contracts";
@@ -8,6 +8,7 @@ export const desktop = isTauri();
 export const api = {
   connectionPreview: (request: NodeConnectionRequest) => invoke<NodeConnectionPreview>("node_connection_preview", { request }),
   connectionTest: (request: NodeConnectionCommit) => invoke<NodeConnectionResult>("node_connection_test", { request }),
+  terminalOpenNode: (request: NodeTerminalRequest) => invoke<TerminalSession>("terminal_open_node", { request }),
   terminalOpen: (dimensions: TerminalSize) => invoke<TerminalSession>("terminal_open_local", { dimensions }),
   terminalPoll: (id: string, ack: number) => invoke<TerminalPacket>("terminal_poll", { id, ack }),
   terminalInput: (id: string, bytes: number[]) => invoke<void>("terminal_input", { id, bytes }),

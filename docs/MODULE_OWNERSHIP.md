@@ -1,6 +1,6 @@
 # Module ownership
 
-Status: workspace/node/key persistence, Nightfly shell, jobs/approvals, local PTY and reviewed direct SSH authentication implemented.
+Status: workspace/node/key persistence, Nightfly shell, jobs/approvals and reviewed local/SSH PTYs implemented.
 Execution services below are future boundaries, not existing modules.
 
 ## Implemented ownership
@@ -14,9 +14,9 @@ Execution services below are future boundaries, not existing modules.
 | src-tauri/services | Active workspace/watch/lifecycle, app-local MRU/restore state, open queue, jobs and fresh-disk reviews | Core; Tauri events; injected queue |
 | src-tauri/commands | Local caller check and typed IPC; offload blocking work | Services/core and native file dialog |
 | ghosh-core/ssh_keys | User-local registry, safe files, key metadata and precedence | Portable filesystem/crypto; injected generator/inspector |
-| ghosh-ssh | Direct SSH handshake, known-host verification/algorithm preference and authentication; no workspace/UI policy | Core SSH DTOs; ssh2/crypto |
+| ghosh-ssh | Direct handshake, exact host/agent identity, file/agent/password auth and SSH PTY; no workspace/UI policy | Core SSH/Pty ports; ssh2/crypto |
 | src-tauri/services/ssh | Trusted fresh context, bounded single-use review tickets, native-only key resolution | Core, ghosh-ssh, active workspace serialization |
-| ghosh-term | Local PTY sessions, bounded replay/input, resize and child cleanup | Core terminal DTOs; portable-pty/libc |
+| ghosh-term | Shared local/remote sessions, bounded replay/input, resize and local child cleanup | Core Pty port; portable-pty/libc |
 | src-tauri/platform | OpenSSH key adapters; separate workspace-scoped Keychain adapter | Core key ports/SecretStore; native tools/framework |
 | src-tauri/lib.rs | Desktop composition; queue exists before setup/native Opened events | Shell/core |
 | React src | Presentation, drafts/dialogs/busy/error state and event coordination | Generated DTOs and typed src/app/ipc.ts |
@@ -39,19 +39,19 @@ Execution services below are future boundaries, not existing modules.
 - Keep peer adapters acyclic; cross-service work uses injected core ports/handles.
 
 ## Future ownership
-- Extend ghosh-ssh: jumps/pool/channels/SFTP/PTY and persistent host enrollment; core/route ports.
+- Extend ghosh-ssh: jumps/pool/exec/SFTP and persistent host enrollment; core/route ports.
 - Existing file-key registry/adapter stays separate from Keychain-only SecretStore.
-  Memory-only encrypted unlock is pending; managed unencrypted-key authentication works.
+  Per-call encrypted-key unlock works; there is no persisted unlock cache.
 
 - ghosh-tunnel: route generations/leases/sidecars/health; core/platform process bindings.
 - ghosh-webview: UUID store lifecycle, every native multiwebview type and page operation.
 - Only ghosh-webview may use multiwebview APIs, behind WebviewProfileBackend.
-- Extend existing ghosh-term through injected SSH/core ports for managed per-node PTYs.
+- Existing ghosh-term accepts the core Pty port for local and managed SSH sessions.
   Terminal input ownership and reserved app shortcuts are explicit in the shell.
 - Native terminal smoke owns local shell/full-screen/resize/signals; SSH fixtures
   separately own managed PTY/auth/route/disconnect tests. Local/remote manual
   TTY and full-screen editor smoke passed; native managed authentication passed both
-  authorized hosts. Managed remote PTY/route/disconnect acceptance remains pending.
+  authorized hosts. Managed PTY passed both hosts; route/disconnect acceptance remains pending.
 - ghosh-certs: issuance/deployment/TLS verification; SSH/secret ports.
 - ghosh-script/recorder/comfy: orchestration through shared core APIs, not duplicate logic.
 - ghosh-mcp/cli: protocol/command adapters; cannot bypass core policy.
@@ -65,7 +65,7 @@ Execution services below are future boundaries, not existing modules.
 - Core tests own persistence/schema/conflict/secret/policy behavior (see TASK_LOG.md for current results).
 - Shell tests own caller restrictions and early/bounded document queue and fresh-disk approval invalidation (see TASK_LOG.md for current results).
 - Native Keychain test is opt-in, creates a temporary item and cleans it up.
-- Browser fixtures own 20 UI/focus/reconciliation journeys; do not claim native effects.
+- Browser fixtures own 22 UI/focus/reconciliation journeys; do not claim native effects.
 - Shared Select owns themed menus, keyboard selection/typeahead and viewport positioning.
 - Platform adapters own legacy-secret availability; Linux fails closed, file keys stay separate.
 - Release tooling owns version guards, native packaging/checksums and sequential tag-only CI.

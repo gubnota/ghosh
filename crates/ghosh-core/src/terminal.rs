@@ -24,3 +24,27 @@ pub struct TerminalPacket {
     pub exit_code: Option<u32>,
     pub failed: bool,
 }
+
+/// Native adapter port. Poll/input/resize must be bounded and never wait for
+/// remote output. Dropping the adapter closes its owned transport.
+pub trait Pty: Send {
+    fn input(&mut self, bytes: Vec<u8>) -> crate::contracts::Result<()>;
+    fn resize(&mut self, size: TerminalSize) -> crate::contracts::Result<()>;
+    fn poll(&mut self) -> crate::contracts::Result<PtyRead>;
+}
+pub struct PtyRead {
+    pub bytes: Vec<u8>,
+    pub exited: bool,
+    pub exit_code: Option<u32>,
+    pub failed: bool,
+}
+impl TerminalSize {
+    pub fn validate(self) -> crate::contracts::Result<Self> {
+        if !(2..=500).contains(&self.rows) || !(2..=1000).contains(&self.cols) {
+            return Err(crate::contracts::AppError::new(
+                crate::contracts::ErrorCode::InvalidDocument,
+            ));
+        }
+        Ok(self)
+    }
+}

@@ -284,3 +284,25 @@ inputs, not prerequisites for the editor or fabricated example assets.
 Related files: IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md,
 IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md; future changes to approvals/workspace/SSH
 contracts are enumerated in the supplement.
+
+
+# ADR-0019: Shared terminal manager and ephemeral SSH credentials
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: Nodes could only test unencrypted file keys while the editor offered agent
+auth. Users need a real terminal after saving a node and an unlocked-key path.
+Decision: Inject a core Pty port into the existing bounded sequenced terminal
+manager. Local portable-pty and direct ssh2 PTYs share xterm, resize, replay and
+cleanup. Reuse single-use, revision-bound host reviews for test/open. Native-only
+file bytes may remain encrypted until transport authentication; transient IPC
+passwords/passphrases are zeroized natively and never persisted. Review and pin
+one agent public identity, with two bounded workers and a five-second deadline.
+Consequences: Both authorized hosts pass managed PTY acceptance. Agent and encrypted
+file keys pass node3; live password, keyboard-interactive, identity selection, jump
+routes and persistent host enrollment remain separate acceptance gates. A stalled
+agent worker can outlive its deadline but cannot attach a terminal afterward.
+Related files: crates/ghosh-core/src/terminal.rs, crates/ghosh-core/src/ssh.rs,
+crates/ghosh-ssh/src/lib.rs, crates/ghosh-term/src/lib.rs,
+src-tauri/src/services/ssh.rs, src/features/nodes/ConnectionTest.tsx.

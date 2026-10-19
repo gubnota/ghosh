@@ -6,10 +6,9 @@ a compact monospace layout, commands and keyboard-operated review dialogs.
 
 **Development status:** workspace persistence, node inventory editing, a file-based
 SSH key library, identity migration, jobs, approval infrastructure and real local
-PTY terminals and reviewed direct SSH authentication tests are working.
+PTY terminals and reviewed managed SSH terminals are working.
 The approved [implementation plan](docs/IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md)
-is in progress. Manual SSH works inside the terminal. Managed SSH terminal sessions,
-YAML scenario execution and the other service screens are still being implemented. Unavailable actions explain
+is in progress. YAML scenario execution and the other service screens are still being implemented. Unavailable actions explain
 their status; prototype screenshots are never presented as working native features.
 
 The approved [operational workflow supplement](docs/IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
@@ -23,6 +22,10 @@ The remaining workflow sections describe planned work.
 These are actual native app captures, not Base44 mockups. Screenshots show public
 metadata for a disposable identity or an explicitly selected existing key; no private
 key material is shown.
+
+![Managed SSH terminal on Debian OrbStack](docs/evidence/ui-shell/24-managed-debian-pty.jpg)
+
+![Managed node3 and Debian SSH sessions in split view](docs/evidence/ui-shell/25-managed-ssh-split.jpg)
 
 ![Themed dropdown with taller rows and padded SVG controls](docs/evidence/ui-shell/23-themed-dropdown.jpg)
 
@@ -100,12 +103,13 @@ legacy `recent.json` is migrated automatically.
    global default. The explicit review migrates schema 1 to schema 2, retaining a
    manifest recovery copy. It does not export legacy Keychain identities.
 5. In **Nodes**, add/edit/import one TOML definition, review the proposed change,
-   and save. In schema 2, choose SSH agent or file key and an inherited/explicit
+   and save. In schema 2, choose SSH agent, per-connection password or file key and an inherited/explicit
    library identity. Saving inventory never connects to a host.
 6. Local workspaces are approved by default. To verify a direct node connection,
    run `node test` or use **Test** in Nodes. Choose the node, review the resolved
    public identity and server fingerprint, then **Authenticate**. This checks access
-   and closes the connection; it does not start a terminal or run commands. See below.
+   and closes the connection. **Terminal** in the node row or `node terminal` opens
+   a managed remote shell after the same review. See below.
 7. Press **Cmd+K**, enter `terminal open`, then review **Open shell** to start
    `/bin/zsh` in your home directory. **New local terminal** creates another
    independent session. Up to eight sessions can stay open; **Split view** displays
@@ -127,7 +131,7 @@ Effective file identity is **node override → workspace default → global defa
 A missing or changed explicit identity fails instead of silently falling back.
 Removing a library reference retains the private file. Relink an external reference
 only to a file with the same public fingerprint. Encrypted imports retain encryption;
-interactive unlock and SSH use of encrypted keys are pending. Never put private keys in a workspace.
+the connection dialog asks for the passphrase without saving it. Never put private keys in a workspace.
 
 ## Use cases and availability
 
@@ -135,10 +139,10 @@ interactive unlock and SSH use of encrypted keys are pending. Never put private 
 | --- | --- |
 | Maintain a portable homelab or GPU-node inventory | Create/open packages; add/edit/import/remove nodes; review changes and conflicts |
 | Reuse SSH identities across workspaces | Existing system files, custom references/copies, Ed25519 generation, defaults and relinking |
-| Verify access before operating on a node | Reviewed native authentication using an unencrypted file key; direct schema-2 nodes only |
+| Verify access before operating on a node | Reviewed direct authentication using file keys, SSH agent or a per-connection password |
 | Operate entirely from the keyboard | Command popup, navigation, tabs, scoped search/save and modal review |
 | Inspect local workspace work and authorizations | Real jobs, approval inbox and revocable native grants; execution integration pending |
-| Troubleshoot locally or on a remote node | Real local PTY, xterm emulator, split/search, manual system SSH; managed node sessions pending |
+| Troubleshoot locally or on a remote node | Real local and managed SSH PTYs, xterm emulator, split/search and optional manual system SSH |
 | Run an Ansible-like scenario on selected nodes | Planned A7 YAML playbooks with check/plan/approve/apply/history; not arbitrary Ansible compatibility |
 | Manage browser profiles, routes, certificates or ComfyUI | Planned native services; current placeholder screens do not execute operations |
 | Give an agent controlled MCP access | Planned, disabled by default; no running MCP server yet |
@@ -152,25 +156,37 @@ The separate managed SSH authentication service also passed on both hosts, in an
 opt-in native integration test and through the release app’s keyboard review flow.
 Native UI authentication completed in 106 ms for Debian and 2,298 ms for node3
 (single observations, not benchmarks). Both server keys matched existing trust records.
-Managed SSH PTYs, persistent host enrollment, SFTP, facts and plan/apply remain pending.
-No test installed software or changed remote files. Full results and remaining
+On 2026-10-19, managed SSH PTYs passed on both hosts: input, resize, acknowledged
+output replay, ANSI/UTF-8, exit status and cleanup. SSH-agent authentication and
+PTY also passed on node3 with a disposable agent and with an encrypted temporary
+copy of the authorized file key. The original key was unchanged. Password
+authentication is implemented but has not been exercised against a live target.
+Persistent host enrollment, jumps, SFTP, facts and plan/apply remain pending.
+The native release UI also passed managed split resizing to 21×48 on both nodes,
+Unicode paste and ANSI output; Debian passed Ctrl+C and Vim edit/save/exit.
+Only a disposable Debian `/tmp` editor file was written; no production
+configuration changed or software was installed. Full results and remaining
 gates are in [the task log](docs/TASK_LOG.md).
 
 ## Test a node connection
 
-Register an unencrypted file key in **SSH Keys**, select it as the workspace default
-or node override, and use a schema-2 node with **File key** authentication. Run `node test` from **Cmd+K**. **Review server**
+Register a file key in **SSH Keys**, select it as the workspace default or node
+override, and use a schema-2 node with **File key** authentication. Alternatively,
+choose **SSH agent** or **Password (ask when connecting)**. Run `node test` from **Cmd+K**. **Review server**
 performs a bounded SSH handshake without sending the private key; review the endpoint,
 effective identity, SHA-256 server fingerprint and known/unknown status before
-**Authenticate**. An unknown server needs an explicit checkbox for this single test;
+**Authenticate**. Encrypted keys/password mode show a per-connection secret field.
+An unknown server needs an explicit checkbox for this single connection;
 verify its fingerprint independently first. Ghosh never silently accepts a changed
 known server key and does not write a new host-trust record in this increment.
 
 The service reads current-user `~/.ssh/known_hosts` and OrbStack's
 `~/.orbstack/ssh/known_hosts` when present. The selected file key comes from Ghosh's
-library; this service does not use system SSH configuration, an agent, Keychain,
-passwords or ProxyCommand. Direct connections on the configured port are supported;
-jump hosts and encrypted-key unlocking remain pending. Existing RSA known-host
+library. Agent mode uses an explicit socket or SSH_AUTH_SOCK, reviews the first
+supported identity and uses only that identity. No fallback/forwarding occurs.
+Passwords/passphrases are cleared after dispatch; SSH never uses Keychain.
+System SSH configuration, ProxyCommand, jump hosts and keyboard-interactive are
+not supported by managed connections. Existing RSA known-host
 records negotiate RSA SHA-2 rather than enabling legacy SHA-1 signatures.
 
 A review expires after two minutes and is single-use. Changes to workspace trust,
@@ -180,6 +196,11 @@ Errors appear in the dialog and **Jobs**; review again to retry. A successful te
 closes the session without opening a shell, gathering facts or changing remote files.
 
 ## Terminal and remote troubleshooting
+
+Use **Nodes → Terminal**, **Terminal → Node terminal**, or `node terminal` in
+Cmd+K. Choose the node, review its endpoint/identity/server key, then **Open SSH
+terminal**. It opens alongside local sessions and uses the same resize, search,
+split, paste and close controls. This requires no server-side Ghosh agent.
 
 Open a workspace, run `terminal open` from the command popup, and confirm **Open
 shell**. This starts a real login shell with your normal startup files, user

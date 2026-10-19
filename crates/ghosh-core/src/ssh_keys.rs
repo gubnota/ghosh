@@ -288,9 +288,8 @@ impl FileKeyRegistry {
             .iter()
             .find(|entry| entry.summary.id == id)
             .ok_or_else(unavailable)?;
-        if entry.summary.encrypted {
-            return Err(AppError::new(ErrorCode::UnsupportedConnection));
-        }
+        // Return the original encrypted bytes too. Only the reviewed native
+        // transport may decrypt them using its ephemeral per-call passphrase.
         let (bytes, stamp) = read_private(Path::new(&entry.summary.path))?;
         if !entry
             .stamp

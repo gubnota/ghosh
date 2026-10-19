@@ -19,5 +19,5 @@ description = "Review file-key metadata and register explicit user-selected file
 commands.allow = ["keys_list", "keys_preview", "keys_commit", "keys_default", "keys_forget", "keys_pick", "keys_generate", "keys_relink", "workspace_key", "workspace_key_preview", "workspace_key_commit", "node_identity"]
 [[permission]]
 identifier = "allow-terminal"
-description = "Open explicit local PTY sessions from the local main shell."
-commands.allow = ["terminal_open_local", "terminal_poll", "terminal_input", "terminal_resize", "terminal_close"]
+description = "Open explicit local and reviewed SSH PTY sessions from the local main shell."
+commands.allow = ["terminal_open_local", "terminal_open_node", "terminal_poll", "terminal_input", "terminal_resize", "terminal_close"]

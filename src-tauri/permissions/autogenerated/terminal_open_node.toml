@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-terminal-open-node"
+description = "Enables the terminal_open_node command without any pre-configured scope."
+commands.allow = ["terminal_open_node"]
+
+[[permission]]
+identifier = "deny-terminal-open-node"
+description = "Denies the terminal_open_node command without any pre-configured scope."
+commands.deny = ["terminal_open_node"]

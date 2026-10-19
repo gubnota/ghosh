@@ -99,8 +99,10 @@ readability and require an explicit group when group readable. Models require
 Pins must resolve to immutable git commits before any apply. Remote paths may
 use `~` only through remote home expansion, never local expansion or shell eval.
 
-For node auth: `key` requires key_ref; `password` requires password_ref; `agent`
-requires neither. `agent_socket` is an optional local path, validated at use.
+For schema-1 node auth: `key` requires key_ref; `password` requires password_ref;
+`agent` requires neither. Schema 2 uses `key_id` or an inherited file key; password
+auth without password_ref asks per connection and never persists the entered secret.
+Legacy secret references remain inert for the native direct transport. `agent_socket` is an optional local path, validated at use.
 ProxyJump composes each hop's declared route; host identity remains the final
 hostname/port, not the local proxy endpoint. Agent forwarding is off by default.
 

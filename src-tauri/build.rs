@@ -4,6 +4,7 @@ fn main() {
             "node_connection_preview",
             "node_connection_test",
             "terminal_open_local",
+            "terminal_open_node",
             "terminal_poll",
             "terminal_input",
             "terminal_resize",

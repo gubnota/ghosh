@@ -2,7 +2,7 @@
 
 Captured from the local arm64 release app on macOS 27, deployment target 14.0.
 These are native screenshots, separate from the Base44 prototype reference.
-Minimum macOS 14 execution and managed SSH PTY/route-loss acceptance remain pending.
+Minimum macOS 14 execution and managed SSH route-loss acceptance remain pending.
 
 - 01–04: Nightfly welcome, conflict/draft preservation, settings and command popup.
 - 05–07: native jobs, approvals and 200% zoom.
@@ -21,13 +21,21 @@ Minimum macOS 14 execution and managed SSH PTY/route-loss acceptance remain pend
   Captured 2026-10-18 in the user-opened workspace without saving any changes.
   Original JPEG, 3384×2168; SHA-256 `cb514c07e5e93d83a2aa9420789bdd4c8fe33c5bc259867a3bc4036e0b5b5c57`.
 
-Remote checks used existing verified host keys with StrictHostKeyChecking=yes,
-BatchMode=yes and bounded connect attempts. No remote files/configuration changed.
+- [24](24-managed-debian-pty.jpg): managed Debian SSH PTY, TTY/ANSI/Unicode,
+  Ctrl+C and Vim edit/save/exit; 2026-10-19, original JPEG 2320×1560.
+- [25](25-managed-ssh-split.jpg): managed node3 and Debian sessions, both resized
+  to 21×48; 2026-10-19, original JPEG 2320×1560.
+
+Manual system-SSH checks used existing verified host keys with StrictHostKeyChecking=yes,
+BatchMode=yes and bounded connect attempts. Those checks changed no remote files.
 Captures 16–17 are manual system-SSH sessions inside a real local PTY.
 Captures 20–22 use the separate ghosh-ssh transport and native review service; both
 authenticate as vm with an explicitly selected existing file key and close without
 executing remote commands. Both match existing known-host records. Managed remote
-PTY, persistent host enrollment, SFTP and facts remain pending. Native vi editing/save/exit and shell-screen restoration also passed.
+PTY acceptance is shown in 24–25. Persistent host enrollment, SFTP and facts remain pending.
+Managed Debian Vim wrote only `/tmp/ghosh-managed-pty-smoke-20261019`;
+no production configuration or software changed. Native local vi editing/save/exit
+and shell-screen restoration also passed.
 Native screenshots were inspected; they are not frontend fixture renderings.
 
 The generated identity is disposable test data. Later managed authentication uses

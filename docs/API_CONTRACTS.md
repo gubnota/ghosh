@@ -1,7 +1,7 @@
 # API contracts
 
-Status: workspace/node/key persistence, operations/approvals and local PTY implemented.
-Managed remote execution and later services are future.
+Status: workspace/node/key persistence, operations/approvals and local/SSH PTY implemented.
+Scenario execution and later services are future.
 Normative target: [ghosh-prompt.md](ghosh-prompt.md), Appendices A/B.
 
 ## Workspace persistence
@@ -118,18 +118,23 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Command popup is an app action router; it cannot evaluate arbitrary shell text
   or bypass trust, target resolution, fresh plans and execution approvals.
 
-## Direct SSH authentication (implemented; not remote execution)
+## Direct SSH authentication and PTY (implemented)
 - `node_connection_preview(request: {context: RevisionRequest, node_id})` returns
-  NodeConnectionPreview {ticket, node_id, host, port, user, identity, host_key}.
-- `node_connection_test(request: {ticket, allow_unknown})` returns
+  NodeConnectionPreview {ticket, node_id, host, port, user, identity, host_key, credential_prompt}.
+- `node_connection_test(request: {ticket, allow_unknown, credential})` returns
   NodeConnectionResult {node_id, host_key, elapsed_ms}; each is a local-only blocking job.
 - Public identity includes source/fingerprint/status; host_key includes algorithm,
   SHA-256 fingerprint and known/unknown trust. Private key bytes never cross IPC.
-- Direct schema-2 file authentication with an available unencrypted key only.
+- Direct file-key authentication supports encrypted keys with a per-connection passphrase.
   Node > workspace > global identity; no fallback for broken explicit references.
+- Agent mode reviews the first supported public identity from an explicit absolute
+  socket or SSH_AUTH_SOCK, then authenticates only that identity. No forwarding/fallback.
+- Schema-2 password mode asks per connection; legacy password_ref is not resolved.
+- credential is optional, bounded to 4096 bytes/no NUL, immediately moved to zeroizing
+  native storage and never persisted/logged. UI clears its field on dispatch/completion.
 - Native preview performs a bounded unauthenticated handshake; checks current-user
   and OrbStack known_hosts read-only, prefers existing matching host algorithms,
-  and fails changed known keys. Unknown needs allow_unknown for this test only.
+  and fails changed known keys. Unknown needs allow_unknown for this connection only.
 - Up to eight UUID tickets; single-use, monotonic 120-second expiry. Bind exact raw
   host key, endpoint, node, workspace/revision/native epoch and key-registry revision.
 - Commit consumes first, reconnects, verifies the reviewed key and revalidates disk,
@@ -139,25 +144,31 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Connection total timeout 5s, session I/O timeout 5s, bounded DNS workers/results.
   Authentication serializes active mutations; cancellation is cooperative at stage
   boundaries/DNS waits, not an interrupt of blocking socket/auth calls.
-- No agents, passwords, encrypted-key unlock, jumps, SSH-config/ProxyCommand,
-  persistent host enrollment, PTY, exec or SFTP in this service increment.
+- Agent calls use at most two worker threads and a five-second caller deadline.
+  A stuck local agent may occupy a worker until it returns; no channel is attached
+  after cancellation/timeout. Password mode does not implement keyboard-interactive.
+- No jumps, SSH-config/ProxyCommand, persistent host enrollment, exec or SFTP yet.
 
-## Local PTY (implemented)
+## Local and managed SSH PTY (implemented)
 - `terminal_open_local(dimensions)` returns TerminalSession {id, target, shell, cwd}.
+- `terminal_open_node({connection: NodeConnectionCommit, dimensions})` consumes
+  the same fresh SSH review/authentication flow and attaches a real remote shell.
+- Core Pty port is injected into ghosh-term; ghosh-ssh owns the nonblocking channel.
+  PTY uses xterm-256color; resize is coalesced while preserving in-flight arguments.
 - `terminal_poll(id, ack)` returns TerminalPacket {sequence, bytes, exited, exit_code, failed}.
 - `terminal_input(id, bytes)`, `terminal_resize(id, dimensions)` and `terminal_close(id)`
-  operate only on native-owned session IDs; bundled local caller checks apply to all five.
+  operate only on native-owned session IDs; bundled local caller checks apply to all six.
 - TerminalSize {rows, cols}: rows 2..500, cols 2..1000; at most eight sessions.
 - Fixed login shell/home cwd, TERM=xterm-256color/COLORTERM=truecolor; no workspace hooks.
 - Output: 16 KiB packets, bounded queue of eight, replay until exact acknowledgement.
   Renderer acknowledges only after parsing; backpressure reaches the real PTY.
 - Native input: four queued 16 KiB chunks; frontend bounded to 64 KiB and retries capacity.
 - Exit/failure is explicit; close is idempotent and reaps the owned child/process group.
-- Close tab/workspace/window guards terminate local sessions; quit also cleans native state.
+- Close tab/workspace/window guards terminate local/SSH sessions; quit cleans native state.
 - No transcript persisted; shell/remote history is independent. Terminal data is sensitive
   user input/output and intentionally crosses this IPC boundary.
 - Manual system SSH works inside this shell; it does not consume the Ghosh key registry
-  or exact-bound native execution grants. Managed SSH remains a separate service.
+  or exact-bound native execution grants. Managed SSH uses the reviewed service above.
 - Keyboard-only coverage/focus and executed native terminal tests are acceptance
   gates in [BASE44_DESIGN_REQUEST.md](BASE44_DESIGN_REQUEST.md).
 

@@ -6,12 +6,12 @@
 | crates/ghosh-core/src/contracts.rs | DTOs, static error envelope, cancellation token |
 | crates/ghosh-core/src/ssh_keys.rs | File-key registry, metadata, precedence, preview/commit and generator/inspector ports |
 | crates/ghosh-core/src/workspace/inventory.rs, identity.rs | Revisioned node CRUD, file identities and explicit schema migration |
-| crates/ghosh-core/src/terminal.rs | Bounded session/packet/size IPC DTOs |
-| crates/ghosh-core/src/ssh.rs | Public endpoint/server-key/review/result DTOs; no private authentication bytes |
-| crates/ghosh-ssh/src/lib.rs | Bounded direct transport, known-host algorithm preference, fingerprint verification and file-key authentication |
+| crates/ghosh-core/src/terminal.rs | Bounded session/packet/size IPC DTOs and injected Pty port |
+| crates/ghosh-core/src/ssh.rs | Public review/result DTOs and per-call zeroizing credential request |
+| crates/ghosh-ssh/src/lib.rs | Direct transport, exact host/agent identity checks, file/agent/password authentication and nonblocking SSH PTY |
 | src-tauri/src/services/ssh.rs | Trusted context, expiring single-use reviews, native key resolution and authorized-host opt-in test |
 | src/features/nodes/ConnectionTest.tsx | Keyboard review, unknown-host opt-in and authentication results |
-| crates/ghosh-term/src/lib.rs | Real local PTY lifecycle, bounded streams, resize and process-group cleanup |
+| crates/ghosh-term/src/lib.rs | Shared local/remote session manager, local PTY, replay/backpressure and process cleanup |
 | crates/ghosh-core/src/operations.rs | Bounded jobs, cancellation, closed stage vocabulary |
 | crates/ghosh-core/src/approvals.rs | Native contexts, exact grants, monotonic expiry and audit |
 | crates/ghosh-core/tests/approvals.rs | Binding/denial/replay/revocation/capacity tests |
@@ -28,7 +28,7 @@
 | src-tauri/src/main.rs, lib.rs | Desktop entry, service composition and early Finder document queue |
 | src-tauri/src/services/history.rs | Bounded atomic MRU/last-open storage and legacy migration |
 | src-tauri/src/services.rs | Active workspace/watch, lifecycle/startup priority, bounded pending requests/tests |
-| src-tauri/src/commands.rs | 34 workspace/key/node/SSH/terminal/operation IPC commands, caller validation/test, blocking-work bridge |
+| src-tauri/src/commands.rs | Workspace/key/node/SSH/terminal/operation IPC commands, caller validation/test, blocking-work bridge |
 | src-tauri/src/platform | Native OpenSSH key generator/inspector; separate Keychain adapter and optional integration test |
 | src/main.tsx | React entry |
 | src/app/App.tsx | Welcome/create/open/close/restore/recent, busy/error/draft/document-open guards |
@@ -87,7 +87,7 @@
 ## Future modules — no source directories yet
 - Extend existing ghosh-ssh: pool/channels/SFTP/jumps/persistent host enrollment (M1.2).
 - ghosh-core tasks/adapters: execution engine and resource adapters (M1.3).
-- ghosh-term exists for local PTY; managed SSH terminal integration remains pending.
+- ghosh-term manages local and direct SSH PTYs; route-loss recovery remains pending.
 - ghosh-webview and ghosh-tunnel: all multiwebview types, profile stores/routes (M3).
 - ghosh-certs: issue/deploy/verify certificates (M4).
 - ghosh-script and ghosh-recorder: runtimes/editor/recording/replay (M5).

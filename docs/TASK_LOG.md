@@ -285,3 +285,39 @@
   workspace remain unchanged. Telegram is design only; no messages sent.
 - Document structure/links/whitespace and request coverage checked. Runtime tests
   were not repeated for this documentation-only increment.
+
+
+## 2026-10-19 — Workspace lifecycle and usable direct SSH terminals
+
+- Approved supplement; committed lifecycle/history/default local approval, command
+  dispatch and keyboard navigation as 73000b3. Opening remains inert and external
+  configuration changes still block effects until validated reload.
+- Added core Pty port and shared bounded local/remote manager. Nodes/Terminal/
+  Cmd+K now open real reviewed ssh2 PTYs using the existing xterm emulator.
+- Direct file-key, SSH-agent and ephemeral schema-2 password authentication share
+  the native single-use review. Encrypted file keys resolve only to native bytes
+  and unlock per call. No passphrase/password storage, Keychain or agent forwarding.
+- Opt-in native tests passed sequentially on debian.orb.local and node3.dabaga.cc:
+  authentication, TTY input, 41×111 resize, acknowledged output replay, ANSI/UTF-8,
+  exit status 7, single-use ticket rejection and session cleanup. OrbStack initially
+  was stopped; starting it restored Debian DNS/reachability.
+- Disposable ssh-agent and encrypted temporary copy of the already authorized key
+  both passed the same node3 PTY checks. Original key/normal agent/server unchanged;
+  no production file writes or software installation. Live password not tested.
+- Checks: 67 Rust tests pass, 2 opt-in skipped in standard suite; Clippy, formatting,
+  generated contract freshness and frontend build pass; all 22 single-worker UI
+  checks pass, including node Terminal and clickable command dispatch.
+- Persistent host enrollment, explicit agent identity choice, keyboard-interactive,
+  jumps, exec/SFTP and route-loss recovery remain.
+  Scenario/Ansible/certificate/timer/monitoring/Comfy/browser/scene services remain
+  pending; direct terminal completion does not imply these are implemented.
+
+- Native release managed PTYs: Debian TTY/ANSI/Unicode paste, Ctrl+C, Vim edit/
+  save/exit and two-node split resizing to 21×48 PASS. Only a disposable Debian
+  `/tmp/ghosh-managed-pty-smoke-20261019` file was written. Evidence 24–25
+  and README now show actual managed sessions.
+- Fixed a focus race after opening the second SSH session; all 22 UI checks pass
+  with immediate input targeting the new session. UI version comes from package.json.
+- Rebuilt arm64 release PASS (11.85 MiB). Native focus regression PASS: opened
+  Debian then node3 from Terminal; immediate keyboard input ran in node3 without
+  refocusing. Footer reports the package version (0.1.1).

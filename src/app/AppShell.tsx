@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./version";
 import { Icon } from "../components/Icon";
 import type { ReactNode } from "react";
 import type { WorkspaceSnapshot } from "../generated/contracts";
@@ -30,6 +31,6 @@ export function AppShell({ workspace, busy, activeJobs, pendingApprovals, dirty,
     }}>{tabs.map(tab => <div className={`tab-item ${tab.id === active ? "active" : ""}`} key={tab.id}><button id={`tab-${tab.id}`} role="tab" aria-selected={tab.id === active} aria-controls={`panel-${tab.id}`} tabIndex={tab.id === active ? 0 : -1} onClick={() => activate(tab.id)}>{tab.title}{tab.destination === "overview" && dirty ? " •" : ""}</button><button className="tab-close" tabIndex={tab.id === active ? 0 : -1} aria-label={`Close ${tab.title} tab`} onClick={() => closeTab(tab.id)}><Icon name="X" /></button></div>)}</div>
       <main className="content" id="main-content" tabIndex={-1}>{children}</main>
     </div>
-    <footer className="statusbar"><span><i />{busy ? "Working…" : "Ready"}</span><span>{workspace ? `${workspace.trusted ? "Approved" : "Paused"} · ${workspace.external_changed ? "Changed on disk" : workspace.read_only ? "Read-only" : "Local files"}` : "No workspace open"}</span><span className="status-end">{dirty ? "Unsaved changes · " : ""}Ghosh 0.1.0 · <button className="quiet" onClick={command}>⌘K commands</button></span></footer>
+    <footer className="statusbar"><span><i />{busy ? "Working…" : "Ready"}</span><span>{workspace ? `${workspace.trusted ? "Approved" : "Paused"} · ${workspace.external_changed ? "Changed on disk" : workspace.read_only ? "Read-only" : "Local files"}` : "No workspace open"}</span><span className="status-end">{dirty ? "Unsaved changes · " : ""}Ghosh {APP_VERSION} · <button className="quiet" onClick={command}>⌘K commands</button></span></footer>
   </div>;
 }

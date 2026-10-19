@@ -1,8 +1,8 @@
 # SSH keys: accepted file storage requirements
 
 Date: 2026-10-18. Status: file-key library/schema migration implemented;
-reviewed direct SSH authentication implemented; encrypted unlock, managed PTY
-and consumer discovery remain pending.
+reviewed direct SSH authentication and managed PTY implemented; consumer discovery
+and persistent host enrollment remain pending.
 This amendment supersedes older Keychain-based SSH examples in the build prompt
 and architecture. It does not change credential storage for unrelated services.
 
@@ -56,7 +56,7 @@ The file-key library is implemented in `ghosh-core/src/ssh_keys.rs` with native
 copies, unencrypted Ed25519 generation, public metadata, defaults, same-fingerprint
 relink and removing metadata while retaining private files. The local registry is
 `ssh/registry.json` under the platform app-data directory. Encrypted imports retain
-their encryption; there is no passphrase IPC or persisted passphrase cache.
+their encryption; per-connection passphrases cross local IPC but are never persisted.
 
 Schema 2 stores opaque registry IDs. Workspace identity changes preview the schema
 migration and retain a recovery manifest before committing. Schema 1 remains
@@ -65,10 +65,10 @@ are inert for transport. The separate non-SSH Keychain adapter still exists.
 
 The approved implementation plan covers the key ports, generated DTOs and tested
 missing/unsafe/encrypted files, precedence, import/relink and reference-only removal.
-The native direct-authentication consumer resolves only reviewed, available,
-unencrypted keys after rechecking registry revision and file safety. Private bytes
-stay native and are held in Zeroizing storage; no key material crosses IPC.
-Next integrate memory-only unlock and managed SSH PTY consumers. Retain non-SSH
+The native direct-authentication/PTY consumer resolves reviewed, available keys
+after rechecking registry revision and file safety. Per-call passphrases/passwords
+use zeroizing native storage; no private key file crosses IPC. Agent mode pins the
+reviewed public identity, with no fallback or forwarding. Retain non-SSH
 SecretStore consumers independently; do not force file-key storage through the
 current Keychain-only parser. Legacy SSH references require an explicit migration
 workflow; never silently export existing Keychain items or rewrite user packages.

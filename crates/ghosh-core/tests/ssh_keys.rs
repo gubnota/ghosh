@@ -313,12 +313,9 @@ fn native_resolution_rechecks_revision_encryption_and_file_identity() {
     let encrypted = fixture(&root, "encrypted", true);
     let snapshot = commit(&mut registry, &encrypted, KeyStorage::Reference);
     let id = &snapshot.keys.iter().find(|key| key.encrypted).unwrap().id;
+    let ciphertext = registry.resolve(&access, id, &snapshot.revision).unwrap();
     assert_eq!(
-        registry
-            .resolve(&access, id, &snapshot.revision)
-            .err()
-            .unwrap()
-            .code,
-        ErrorCode::UnsupportedConnection
+        ciphertext.as_slice(),
+        fs::read(&encrypted).unwrap().as_slice()
     );
 }

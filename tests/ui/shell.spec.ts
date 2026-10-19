@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 
 // Browser-only deterministic IPC fixture. This does not exercise native services.
-async function fixture(page: Page, trusted = true, unknown = false) {
+async function fixture(page: Page, trusted = true, unknown = false, credential = false) {
   await page.route("**/", async route => {
     const response = await route.fetch();
     const body = (await response.text()).replace('<script type="module" src="/src/main.tsx"></script>', `<script type="module">
@@ -20,11 +20,12 @@ async function fixture(page: Page, trusted = true, unknown = false) {
       window.fixtureOperations = { jobs: { sequence: 1, jobs: [{id:'job-1',kind:'workspace_open',state:'succeeded',cancellable:false,started_at:Date.now(),finished_at:Date.now(),error:null,stages:['started','completed']}] }, approvals: { sequence: 1, requests: [], audit: [] } };
       mockIPC(async (cmd, args) => {
         window.fixtureCalls.push(cmd);
-        if (cmd === 'node_connection_preview') return {ticket:'review-fixture',node_id:args.request.node_id,host:'192.0.2.1',port:22,user:'admin',identity:{source:'node',key_id:'fixture-key',public:{algorithm:'ED25519',fingerprint:'SHA256:identity-fixture'},status:'available',registry_revision:'keys-1'},host_key:{algorithm:'ED25519',fingerprint:'SHA256:host-fixture',trust:${unknown}?'unknown':'known'}};
+        if (cmd === 'node_connection_preview') return {ticket:'review-fixture',node_id:args.request.node_id,host:'192.0.2.1',port:22,user:'admin',identity:{source:'node',key_id:'fixture-key',public:{algorithm:'ED25519',fingerprint:'SHA256:identity-fixture'},status:'available',registry_revision:'keys-1'},host_key:{algorithm:'ED25519',fingerprint:'SHA256:host-fixture',trust:${unknown}?'unknown':'known'},credential_prompt:${credential}?'Key passphrase':null};
         if (cmd === 'node_connection_test') {window.fixtureAuthentication = args.request;return {node_id:'edge1',host_key:{algorithm:'ED25519',fingerprint:'SHA256:host-fixture',trust:'known'},elapsed_ms:42};}
+        if (cmd === 'terminal_open_node') {window.fixtureAuthentication = args.request.connection;return {id:'remote-fixture-'+(++window.fixtureTerminalCount),target:'edge1 · admin@192.0.2.1:22',shell:'SSH login shell',cwd:'~'};}
         if (cmd === 'terminal_open_local') return {id:'pty-fixture-'+(++window.fixtureTerminalCount),target:'Local machine',shell:'/bin/zsh',cwd:'/fixture/home'};
         if (cmd === 'terminal_poll') {window.fixtureTerminalAck.push(args.ack); return args.ack === 0 ? {sequence:1,bytes:Array.from(new TextEncoder().encode('REAL_PTY_FIXTURE 世界\\r\\n')),exited:false,exit_code:null,failed:false} : {sequence:1,bytes:[],exited:false,exit_code:null,failed:false};}
-        if (cmd === 'terminal_input') {window.fixtureTerminalInput.push(...args.bytes);return null;}
+        if (cmd === 'terminal_input') {window.fixtureTerminalInput.push(...args.bytes);window.fixtureLastInputSession=args.id;return null;}
         if (cmd === 'terminal_resize' || cmd === 'terminal_close') return null;
         if (cmd === 'workspace_key') return window.fixtureWorkspace.default_key || null;
         if (cmd === 'workspace_key_preview') return {digest:'migration-review',before_schema:window.fixtureWorkspace.schema,before_default:null,after_default:args.request.default_key,backup:'.ghosh-manifest-r1.backup',legacy_nodes:['old-key-node']};
@@ -614,4 +615,51 @@ test("bracket shortcuts wrap tabs; close workspace guards draft then returns to 
   await expect(page.getByRole("button", { name: "Remove Test fleet from history" })).toBeVisible();
   const calls = await page.evaluate(() => (window as unknown as { fixtureCalls: string[] }).fixtureCalls);
   expect(calls.filter(cmd => cmd === "workspace_close")).toHaveLength(1);
+});
+
+
+test("node terminal opens from inventory after review and clears its connection secret", async ({ page }) => {
+  await fixture(page, true, false, true);
+  await page.getByRole("navigation").getByRole("button", { name: "Nodes", exact: true }).click();
+  await page.getByRole("button", { name: "Terminal edge1", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Open node terminal" });
+  await dialog.getByRole("button", { name: "Review server", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog).toContainText("SHA256:host-fixture");
+  expect(await page.evaluate(() => (window as any).fixtureCalls.includes("terminal_open_node"))).toBe(false);
+  await dialog.getByLabel("Key passphrase", { exact: true }).fill("disposable-ui-secret");
+  await dialog.getByRole("button", { name: "Open SSH terminal", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByRole("tab", { name: "Terminal", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("group", { name: "Terminal sessions" })).toContainText("edge1");
+  await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible();
+  await expect(page.locator(".xterm-helper-textarea")).toBeFocused();
+  expect(await page.evaluate(() => (window as any).fixtureAuthentication.credential)).toBe("disposable-ui-secret");
+  expect(await page.evaluate(() => JSON.stringify(localStorage).includes("disposable-ui-secret"))).toBe(false);
+  await page.getByRole("button", { name: "Node terminal", exact: true }).click();
+  await dialog.getByRole("button", { name: "Review server", exact: true }).click();
+  await dialog.getByLabel("Key passphrase", { exact: true }).fill("second-disposable-secret");
+  await dialog.getByRole("button", { name: "Open SSH terminal", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  const selectedPane = page.locator(".terminal-pane:not([hidden])");
+  await expect(selectedPane.locator(".xterm-helper-textarea")).toBeFocused();
+  await page.keyboard.type("pwd");
+  await expect.poll(() => page.evaluate(() => (window as any).fixtureLastInputSession)).toBe("remote-fixture-2");
+  await page.getByRole("button", { name: "Close session", exact: true }).click();
+  await page.getByRole("button", { name: "Terminate session", exact: true }).click();
+  await page.getByRole("button", { name: "Close session", exact: true }).click();
+  await page.getByRole("button", { name: "Terminate session", exact: true }).click();
+  await expect(page.getByText("No terminal sessions", { exact: true })).toBeVisible();
+});
+
+test("node terminal command is clickable and offers configured nodes", async ({ page }) => {
+  await fixture(page);
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("combobox", { name: "Search commands" }).fill("node terminal");
+  await page.getByRole("option", { name: /Open node terminal/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Open node terminal" });
+  await expect(dialog.getByLabel("Node", { exact: true })).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).fixtureCalls.includes("terminal_open_node"))).toBe(false);
 });

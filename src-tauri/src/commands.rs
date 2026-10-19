@@ -58,6 +58,16 @@ pub async fn node_connection_test(
     run(move || service.connection_test(request)).await
 }
 #[tauri::command]
+pub async fn terminal_open_node(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: NodeTerminalRequest,
+) -> Result<TerminalSession> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.terminal_open_node(request)).await
+}
+#[tauri::command]
 pub async fn terminal_open_local(
     window: WebviewWindow,
     state: State<'_, Arc<Services>>,

@@ -23,6 +23,7 @@ pub fn run() {
             commands::node_connection_preview,
             commands::node_connection_test,
             commands::terminal_open_local,
+            commands::terminal_open_node,
             commands::terminal_poll,
             commands::terminal_input,
             commands::terminal_resize,

@@ -12,8 +12,9 @@
 - Working app: create/open/inspect/rename/reload/trust local workspaces.
 - File-key library, schema-2 identity migration and node CRUD are implemented.
 - Real local PTY/emulator and manual SSH to both authorized targets pass native smoke.
-- Managed direct SSH authentication tests now work with reviewed file keys/host fingerprints.
-- Managed SSH PTYs, playbooks/runs, browser automation, scripting and MCP remain pending.
+- Managed direct SSH authentication and PTYs work with reviewed host fingerprints.
+- File keys, encrypted keys and SSH agent passed live tests; per-call password is implemented.
+- Playbooks/runs, browser automation, scripting and MCP remain pending.
 
 ## Read first and navigate
 - Six memory files summarize actual behavior; keep them short and current.
@@ -24,7 +25,7 @@
 - [TASK_LOG.md](TASK_LOG.md) records real checks and remaining verification gaps.
 - [IMPLEMENTATION_PLAN_M1.md](IMPLEMENTATION_PLAN_M1.md) records approved scope/outcome.
 - [IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md](IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
-  is approved: lifecycle/default approval implemented; SSH/Ansible/timers/monitoring and expanded workflows pending.
+  is approved: lifecycle/default approval and direct SSH PTYs implemented; Ansible/timers/monitoring and expanded workflows pending.
 - Full target architecture: ARCHITECTURE.md; sequencing: MILESTONES.md.
 - Target schemas/API: WORKSPACE_SCHEMA.md, SCRIPTING_API.md, MCP_SURFACE.md.
 - User source: ghosh-prompt.md (user-owned, intentionally ignored by Git).
@@ -129,12 +130,13 @@
 - Existing Keychain-only SecretRef stays separate from implemented file-key registry.
 - Registry is user-local ssh/registry.json; managed ssh/<uuid>.key files are 0600/0700.
 - Effective file key: node > workspace > global; explicit missing key cannot fall back.
-- Encrypted files retain encryption; memory-only unlock and consumer discovery pending.
+- Encrypted files retain encryption; per-connection unlock works without saving passphrases.
 - Local PTY exists and passed local/native manual SSH tests on debian.orb.local
   and node3.dabaga.cc. Managed authentication also passed on both, including native UI.
-- Direct schema-2 unencrypted file keys only; no agent/config/jumps/remote commands.
-- Known hosts: user + OrbStack files, read-only; changed keys fail; unknown is one-test opt-in.
-- Managed per-node PTY and persistent host enrollment remain pending.
+- Direct file keys, SSH agent and schema-2 per-call passwords share reviewed authentication.
+- Known hosts: user + OrbStack files, read-only; changed keys fail; unknown is per-connection opt-in.
+- Managed SSH PTYs passed input/resize/Unicode/exit/cleanup on both authorized hosts.
+- Persistent host enrollment, jumps, exec/SFTP and scenario execution remain pending.
 - Base44 handoff: docs/base44/; ten real JPEG screenshots, brief, offline gallery and ZIP.
 - Original workspace opened without edits/trust; fixture used for conflict/node captures.
 - Live Base44 reference inspected via Browser; 33 captures and observed/placeholder
@@ -142,11 +144,11 @@
 - IMPLEMENTATION_PLAN_UI_FUNCTIONALITY.md is approved: 14 sequential phases.
 - Shell implemented; phase 3 jobs/approval infrastructure implemented, entity storage pending.
 - Phase 4 key/node storage implemented; phase 5 local PTY implemented.
-- Remaining gates: encrypted unlock, managed SSH PTY/SFTP/facts and later phases.
+- Remaining gates: persistent host enrollment, jumps/SFTP/facts and later phases.
 
 ## Future platform gates
 - SSH: strict known_hosts, scoped pooled channels, bounded operations and cancellation.
-- Terminal: portable-pty/xterm implemented locally; remote service integration pending.
+- Terminal: portable-pty/xterm plus injected managed SSH PTY implemented.
 - Scripting: future embedded JS plus trusted bridges.
 - Multiwebview belongs only in future ghosh-webview behind WebviewProfileBackend.
 - Enable Tauri unstable only when multiwebview is introduced; review pinned upgrades.
@@ -160,12 +162,12 @@
 - Approve a concrete plan before the next software increment; avoid future scaffolding.
 - Keep small coherent changes; preserve user-owned prompt and .gitignore entries.
 - User requested sequential work: no parallel agents or builds for this increment.
-- Latest checks: formatting/Clippy, 62 Rust tests (2 opt-in tests skipped), 14 browser UI tests, contract freshness.
+- Latest checks: formatting/Clippy, 67 Rust tests (2 opt-in tests skipped), 22 browser UI tests, contract freshness.
 - Arm64 release built; native local/Debian/node3 TTY tests pass, screenshots in README.
 - Browser IPC fixtures verify presentation; they do not prove native execution.
 - Optional native Keychain create/read/delete test passed outside the restricted sandbox.
 - Native smoke passed: create/save/conflict/reload/trust/restart and cold/warm document open.
 - Native Nightfly/keyboard/draft/conflict smoke passed at 1160×780 on macOS 27.
 - Native 200% shell captured; minimum macOS 14 and broad terminal layout matrix pending.
-- CI is configured but not remotely executed; signing/notarization are not configured.
+- Tag-only CI triggered for v0.1.1; final artifact status needs inspection. Signing/notarization are not configured.
 - Update memory/contracts/task evidence whenever behavior or scope changes.

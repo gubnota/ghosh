@@ -79,7 +79,7 @@ impl AppError {
                 "SSH authentication failed for the selected identity. No fallback identity was attempted."
             }
             ErrorCode::UnsupportedConnection => {
-                "Connection testing currently requires a direct node and an unencrypted file key. Agent, password, encrypted-key unlock and jump routes are not yet available."
+                "This connection requires a direct route. Legacy secret references and jump routes are not supported yet; select a file key, SSH agent, or password entered at connection time."
             }
         };
         Self {
