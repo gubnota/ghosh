@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "allow-automation"
 description = "Workspace automation authoring and execution from the local shell"
-commands.allow = ["run_start", "runs_list", "run_stop", "automations_list", "automation_read", "automation_preview", "automation_lint", "automation_commit"]
+commands.allow = ["playbook_import", "playbook_export", "notebook_parse", "runs_cleanup", "run_start", "runs_list", "run_stop", "automations_list", "automation_read", "automation_preview", "automation_lint", "automation_commit"]

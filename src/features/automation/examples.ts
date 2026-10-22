@@ -1,6 +1,15 @@
+import successExample from "../../../examples/playbooks/steps-success.steps.yml?raw";
+import failureExample from "../../../examples/playbooks/steps-failure.steps.yml?raw";
+import timeoutExample from "../../../examples/playbooks/steps-timeout.steps.yml?raw";
 import type { AutomationDocument } from "../../generated/contracts";
 
 export const examples: { label: string; description: string; document: AutomationDocument }[] = [
+  { label: "Multistep · successful file and checks", description: "Creates /tmp/ghosh-playbook-example/output.txt, checks its content, then prints it. Finite timeouts and 0 (no timeout). Requires only Shell.", document: {
+    id: "steps-success", kind: "notebook", source: successExample } },
+  { label: "Multistep · intentional failure", description: "Prints output, exits with code 7, and leaves the final step unrun. Demonstrates stopping at the first failure.", document: {
+    id: "steps-failure", kind: "notebook", source: failureExample } },
+  { label: "Multistep · intentional timeout", description: "A 5-second sleep has a 1-second limit and times out. Run the last step by itself to try 0 with no timeout.", document: {
+    id: "steps-timeout", kind: "notebook", source: timeoutExample } },
   { label: "Simple script with success check", description: "No Ansible required. Check the directory, create it only when missing, then verify success. Run locally or over SSH.", document: {
     id: "checked-script", kind: "playbook", source: `schema: 1
 name: Simple script with success check

@@ -394,6 +394,16 @@ impl Connection {
         Ok(())
     }
 
+    pub fn monitor(self) -> Result<Box<dyn ghosh_core::monitor::MonitorTransport>> {
+        if !self.reviewed || !self.session.authenticated() {
+            return Err(AppError::new(ErrorCode::Denied));
+        }
+        Ok(Box::new(RemoteMonitor {
+            session: self.session,
+            channels: [None, None],
+        }))
+    }
+
     pub fn terminal(self, dimensions: TerminalSize) -> Result<Box<dyn Pty>> {
         let dimensions = dimensions.validate()?;
         if !self.reviewed || !self.session.authenticated() {
@@ -575,6 +585,55 @@ impl Pty for RemotePty {
             exit_code: self.exit_code,
             failed: self.failed,
         })
+    }
+}
+
+struct RemoteMonitor {
+    session: ssh2::Session,
+    channels: [Option<ssh2::Channel>; 2],
+}
+impl ghosh_core::monitor::MonitorTransport for RemoteMonitor {
+    fn start(&mut self, slot: usize, command: &str) -> Result<()> {
+        self.stop(slot);
+        self.session.set_blocking(true);
+        let result = (|| {
+            let mut channel = self.session.channel_session().map_err(|_| failed())?;
+            channel
+                .handle_extended_data(ssh2::ExtendedData::Merge)
+                .map_err(|_| failed())?;
+            channel.exec(command).map_err(|_| failed())?;
+            self.channels[slot] = Some(channel);
+            Ok(())
+        })();
+        self.session.set_blocking(false);
+        result
+    }
+    fn poll(&mut self, slot: usize) -> Result<ghosh_core::terminal::PtyRead> {
+        let channel = self.channels[slot].as_mut().ok_or_else(failed)?;
+        let mut bytes = vec![0; 16384];
+        let n = match channel.read(&mut bytes) {
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => 0,
+            Err(_) => return Err(failed()),
+        };
+        bytes.truncate(n);
+        let exited = n == 0 && channel.eof();
+        let exit_code = if exited {
+            channel.exit_status().ok().and_then(|n| n.try_into().ok())
+        } else {
+            None
+        };
+        Ok(ghosh_core::terminal::PtyRead {
+            bytes,
+            exited,
+            exit_code,
+            failed: false,
+        })
+    }
+    fn stop(&mut self, slot: usize) {
+        if let Some(mut channel) = self.channels[slot].take() {
+            let _ = channel.close();
+        }
     }
 }
 

@@ -2,9 +2,9 @@ import { Select } from "../../components/Select";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../../components/Dialog";
 import { api, errorMessage } from "../../app/ipc";
-import type { NodeConnectionPreview, NodeConnectionResult, WorkspaceSnapshot, TerminalSession } from "../../generated/contracts";
+import type { NodeConnectionPreview, NodeConnectionResult, WorkspaceSnapshot, TerminalSession, MonitorSession } from "../../generated/contracts";
 
-export function ConnectionTest({ workspace, target, mode = "test", onTerminal, dismiss, busyChanged }: { workspace: WorkspaceSnapshot; target?: string; mode?: "test" | "terminal"; onTerminal?: (session: TerminalSession) => void; dismiss: () => void; busyChanged: (busy: boolean) => void }) {
+export function ConnectionTest({ workspace, target, mode = "test", onTerminal, onMonitor, dismiss, busyChanged }: { workspace: WorkspaceSnapshot; target?: string; mode?: "test" | "terminal" | "monitor"; onMonitor?: (session: MonitorSession) => void; onTerminal?: (session: TerminalSession) => void; dismiss: () => void; busyChanged: (busy: boolean) => void }) {
   const [node, setNode] = useState(target || workspace.nodes[0]?.id || "");
   const [preview, setPreview] = useState<NodeConnectionPreview | null>(null);
   const [result, setResult] = useState<NodeConnectionResult | null>(null);
@@ -15,6 +15,8 @@ export function ConnectionTest({ workspace, target, mode = "test", onTerminal, d
   const credentialInput = useRef<HTMLInputElement>(null);
   const started = useRef(false);
   const inFlight = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const stale = workspace.revision !== revision || workspace.external_changed || !workspace.trusted;
   useEffect(() => { busyChanged(busy); return () => busyChanged(false); }, [busy, busyChanged]);
   useEffect(() => { if (preview && !busy) credentialInput.current?.focus(); }, [preview, busy]);
@@ -23,8 +25,14 @@ export function ConnectionTest({ workspace, target, mode = "test", onTerminal, d
     // The user requested direct SSH without an enrollment/approval dialog.
     const connection = { ticket: prepared.ticket, allow_unknown: true, credential: secret || null };
     setCredential(""); setPreview(null);
-    if (mode === "terminal") {
+    if (mode === "monitor") {
+      const session = await api.monitorOpen({ context: { workspace_id: workspace.id, revision }, connection });
+      if (!alive.current) { await api.monitorClose(session.id); return; }
+      if (onMonitor) onMonitor(session); else await api.monitorClose(session.id);
+      dismiss();
+    } else if (mode === "terminal") {
       const session = await api.terminalOpenNode({ connection, dimensions: { rows: 24, cols: 80 } });
+      if (!alive.current) { await api.terminalClose(session.id); return; }
       if (onTerminal) onTerminal(session); else await api.terminalClose(session.id);
       dismiss();
     } else setResult(await api.connectionTest(connection));
@@ -37,6 +45,7 @@ export function ConnectionTest({ workspace, target, mode = "test", onTerminal, d
       else {
         setCredential("");
         const prepared = await api.connectionPreview({ context: { workspace_id: workspace.id, revision }, node_id: node });
+        if (!alive.current) return;
         if (prepared.credential_prompt) setPreview(prepared);
         else await authenticate(prepared, "");
       }
@@ -48,8 +57,8 @@ export function ConnectionTest({ workspace, target, mode = "test", onTerminal, d
     if (target && !started.current) { started.current = true; void connect(); }
   }, []);
   return <Dialog title="connection-test-title" dismiss={dismiss} busy={busy}><form onSubmit={e => { e.preventDefault(); void connect(); }}>
-    <p className="eyebrow">SSH · DIRECT CONNECTION</p><h2 id="connection-test-title">{mode === "terminal" ? "Open node terminal" : "Test node connection"}</h2>
-    {!preview && !result && <>{!target && <><label htmlFor="connection-node">Node</label><Select id="connection-node" data-dialog-focus value={node} disabled={busy} onChange={e => setNode(e.target.value)}>{workspace.nodes.map(item => <option key={item.id} value={item.id}>{item.id} · {item.user}@{item.host}:{item.port}</option>)}</Select></>}<p className="field-help">{target && `${target} · `}{mode === "terminal" ? "A real interactive shell will open on this node." : "Test SSH login without running a remote command."}</p></>}
+    <p className="eyebrow">SSH · DIRECT CONNECTION</p><h2 id="connection-test-title">{mode === "monitor" ? "Connect node Monitor" : mode === "terminal" ? "Open node terminal" : "Test node connection"}</h2>
+    {!preview && !result && <>{!target && <><label htmlFor="connection-node">Node</label><Select id="connection-node" data-dialog-focus value={node} disabled={busy} onChange={e => setNode(e.target.value)}>{workspace.nodes.map(item => <option key={item.id} value={item.id}>{item.id} · {item.user}@{item.host}:{item.port}</option>)}</Select></>}<p className="field-help">{target && `${target} · `}{mode === "monitor" ? "Open an independent connection for resource probes and explicitly requested log commands." : mode === "terminal" ? "A real interactive shell will open on this node." : "Test SSH login without running a remote command."}</p></>}
     {preview && <><p>{preview.user}@{preview.host}:{preview.port}</p><label htmlFor="connection-credential">{preview.credential_prompt}</label><input ref={credentialInput} id="connection-credential" data-dialog-focus type="password" autoComplete="off" maxLength={4096} value={credential} disabled={busy} onChange={event => setCredential(event.target.value)} /><p className="field-help">Used for this connection only. Never saved in Ghosh or Keychain.</p></>}
     {result && <div role="status"><h3>Authenticated successfully</h3><p>{result.node_id} · {result.elapsed_ms} ms</p><p className="fingerprint">{result.host_key.fingerprint}</p><p className="field-help">Connection closed. No shell or remote command was started.</p></div>}
     {stale && <p role="alert" className="notice error">Resume workspace operations in Overview and reload changed files before connecting.</p>}

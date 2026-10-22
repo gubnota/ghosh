@@ -20,7 +20,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::monitor_open,
+            commands::monitor_poll,
+            commands::monitor_start,
+            commands::monitor_close,
             commands::run_start,
+            commands::playbook_import,
+            commands::playbook_export,
+            commands::notebook_parse,
+            commands::runs_cleanup,
+            commands::system_key_candidates,
             commands::runs_list,
             commands::run_stop,
             commands::automations_list,
@@ -71,7 +80,9 @@ pub fn run() {
         .expect("Ghosh desktop failed");
     app.run(move |app, event| {
         if matches!(event, tauri::RunEvent::Exit) {
-            app.state::<Arc<services::Services>>().terminals.close_all();
+            let services = app.state::<Arc<services::Services>>();
+            services.monitor_shutdown();
+            services.terminals.close_all();
         }
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Opened { urls } = event {

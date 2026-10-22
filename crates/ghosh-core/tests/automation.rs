@@ -253,3 +253,124 @@ fn standard_ansible_is_preserved_without_a_ghosh_task_schema() {
         source: SOURCE.into()
     }));
 }
+
+#[test]
+fn notebook_roundtrips_saved_cells_and_rejects_invalid_documents() {
+    let (_tmp, mut ws) = fixture();
+    let source = "schema: 1\nname: Notebook\ncells:\n  - id: first\n    title: Inspect\n    runtime: shell\n    code: echo ready\n    timeout_s: 5\n";
+    let mut change = mutation(&ws);
+    change.document = AutomationDocument {
+        id: "inspect".into(),
+        kind: AutomationKind::Notebook,
+        source: source.into(),
+    };
+    assert!(validate(&change.document).valid);
+    let commit = reviewed(&ws, change);
+    ws.automation_commit(Principal::LocalUi, &commit, &Cancellation::default())
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(ws.root().join("playbooks/inspect.steps.yml")).unwrap(),
+        source
+    );
+    let items = ws.automations(Principal::LocalUi, &context(&ws)).unwrap();
+    assert_eq!(items[0].kind, AutomationKind::Notebook);
+    assert_eq!(items[0].id, "inspect");
+    assert_eq!(
+        parse_notebook(&source.replace("timeout_s: 5", "timeout_s: -1"))
+            .unwrap()
+            .cells[0]
+            .timeout_s,
+        -1
+    );
+    assert!(parse_notebook(&source.replace("timeout_s: 5", "timeout_s: 0")).is_ok());
+    let book = parse_notebook(source).unwrap();
+    assert_eq!(book.cells[0].id, "first");
+    for bad in [
+        source.replace("runtime: shell", "runtime: notebook"),
+        source.replace("timeout_s: 5", "timeout_s: -2"),
+        source.replace("timeout_s: 5", "timeout_s: 3601"),
+        source.replace("id: first", "id: ../bad"),
+        format!(
+            "{source}  - id: first\n    title: Duplicate\n    runtime: shell\n    code: true\n"
+        ),
+        source.replace("schema: 1", "schema: 2"),
+        source.replace("code: echo ready", "code: ''"),
+    ] {
+        assert!(parse_notebook(&bad).is_err(), "{bad}");
+    }
+    assert_ne!(context(&ws).revision, commit.mutation.context.revision);
+}
+
+#[test]
+fn legacy_multistep_playbooks_edit_in_place_and_cross_folder_duplicates_fail() {
+    let (tmp, ws) = fixture();
+    let root = ws.root().to_owned();
+    drop(ws);
+    let source = include_str!("../../../examples/playbooks/steps-success.steps.yml");
+    let legacy = root.join("scripts/legacy.steps.yml");
+    fs::write(&legacy, source).unwrap();
+    let mut ws = Workspace::open(&root, &tmp.path().join("locks")).unwrap();
+    let items = ws.automations(Principal::LocalUi, &context(&ws)).unwrap();
+    assert_eq!(items[0].kind, AutomationKind::Notebook);
+    assert!(!items[0].kind.is_script());
+    let changed = source.replace("Hello from Ghosh", "Updated example");
+    let request = reviewed(
+        &ws,
+        AutomationMutation {
+            context: context(&ws),
+            document: AutomationDocument {
+                id: "legacy".into(),
+                kind: AutomationKind::Notebook,
+                source: changed.clone(),
+            },
+            replace: true,
+            remove: false,
+        },
+    );
+    ws.automation_commit(Principal::LocalUi, &request, &Cancellation::default())
+        .unwrap();
+    assert_eq!(fs::read_to_string(&legacy).unwrap(), changed);
+    assert!(!root.join("playbooks/legacy.steps.yml").exists());
+    drop(ws);
+    fs::write(root.join("playbooks/legacy.steps.yml"), source).unwrap();
+    let ws = Workspace::open(&root, &tmp.path().join("locks")).unwrap();
+    assert_eq!(
+        ws.automations(Principal::LocalUi, &context(&ws))
+            .unwrap_err()
+            .code,
+        ErrorCode::Conflict
+    );
+}
+
+#[test]
+fn notebook_saves_zero_timeout_and_syntax_errors_without_executing() {
+    let (tmp, mut ws) = fixture();
+    let source = "schema: 1\nname: Draft\ncells:\n  - id: draft\n    title: Fix later\n    runtime: shell\n    code: 'if then'\n    timeout_s: 0\n    success_check: 'if then'\n";
+    let mut change = mutation(&ws);
+    change.document = AutomationDocument {
+        id: "draft".into(),
+        kind: AutomationKind::Notebook,
+        source: source.into(),
+    };
+    let request = reviewed(&ws, change);
+    ws.automation_commit(Principal::LocalUi, &request, &Cancellation::default())
+        .unwrap();
+    let root = ws.root().to_owned();
+    drop(ws);
+    let ws = Workspace::open(&root, &tmp.path().join("locks")).unwrap();
+    let saved = ws
+        .automation_read(
+            Principal::LocalUi,
+            &AutomationReadRequest {
+                context: context(&ws),
+                id: "draft".into(),
+                kind: AutomationKind::Notebook,
+            },
+        )
+        .unwrap();
+    assert_eq!(saved.source, source);
+    assert_eq!(parse_notebook(&saved.source).unwrap().cells[0].timeout_s, 0);
+    let error = parse_notebook(&source.replace("timeout_s: 0", "timeout_s: -2")).unwrap_err();
+    assert!(error.message.contains("timeout"), "{}", error.message);
+    assert!(!error.message.contains("if then"));
+}

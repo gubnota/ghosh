@@ -18,6 +18,29 @@ pub fn entity_id(id: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_-".contains(&b))
 }
+/// Node names preserve ASCII case; other entity IDs remain lowercase.
+pub fn validate_node_id(id: &str) -> Result<()> {
+    if !id.is_empty()
+        && id.len() <= 64
+        && id.as_bytes()[0].is_ascii_alphanumeric()
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
+    {
+        Ok(())
+    } else {
+        Err(AppError {
+            code: ErrorCode::InvalidDocument,
+            message: "Node IDs must use 1–64 ASCII letters, digits, hyphens or underscores, starting with a letter or digit. No spaces.".into(),
+        })
+    }
+}
+pub(super) fn node_id_collision() -> AppError {
+    AppError {
+        code: ErrorCode::Conflict,
+        message: "A node with this ID already exists with different capitalization. Use its exact ID to edit it, or choose a different ID.".into(),
+    }
+}
 pub fn validate_name(name: &str) -> Result<()> {
     if name.trim().is_empty() || name.len() > 120 || name.chars().any(char::is_control) {
         return Err(invalid());
@@ -185,6 +208,7 @@ impl Manifest {
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, ts_rs::TS)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthMethod {
+    System,
     Key,
     Agent,
     Password,
@@ -214,8 +238,8 @@ pub struct Node {
 }
 impl Node {
     pub fn validate(&self, file_id: &str) -> Result<()> {
+        validate_node_id(&self.id)?;
         if !(1..=2).contains(&self.schema)
-            || !entity_id(&self.id)
             || self.id != file_id
             || self.port == 0
             || self.host.is_empty()
@@ -237,9 +261,8 @@ impl Node {
         }
         if let Some(jump) = &self.jump
             && !jump.is_empty()
-            && !entity_id(jump)
         {
-            return Err(invalid());
+            validate_node_id(jump)?;
         }
         if let Some(reference) = &self.auth.key_ref {
             SecretRef::parse(reference)?;
@@ -270,7 +293,7 @@ impl Node {
             {
                 return Err(invalid());
             }
-            AuthMethod::Agent
+            AuthMethod::System | AuthMethod::Agent
                 if self.auth.key_ref.is_some() || self.auth.password_ref.is_some() =>
             {
                 return Err(invalid());
@@ -278,6 +301,20 @@ impl Node {
             _ => (),
         }
         Ok(())
+    }
+}
+
+/// Legacy default agent nodes adopt the system identity; explicit agents retain their socket.
+impl Node {
+    pub fn effective_auth_method(&self) -> AuthMethod {
+        if matches!(self.auth.method, AuthMethod::Agent)
+            && self.schema == 1
+            && self.auth.agent_socket.is_none()
+        {
+            AuthMethod::System
+        } else {
+            self.auth.method.clone()
+        }
     }
 }
 

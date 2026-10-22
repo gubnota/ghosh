@@ -202,90 +202,75 @@ Only a disposable Debian `/tmp` editor file was written; no production
 configuration changed or software was installed. Full results and remaining
 gates are in [the task log](docs/TASK_LOG.md).
 
-## Create scenarios and scripts
+## Connect nodes with existing system keys
 
-Open **Playbooks**, or run `playbook new` from Cmd+K. Choose an example, give it a
-safe ID, edit the source, **Validate**, then **Save**. **Import source** accepts pasted
-source. **Edit** reopens exact saved text, including comments. External edits require
-reload; **Remove** retains a recoverable `.removed` file. Opening, validating or saving
-never executes source. Files live in the configured `playbooks/` and `scripts/` folders.
+New nodes use **System keys (default)** automatically: the current user's
+`~/.orbstack/ssh/id_ed25519` for `*.orb.local`, otherwise `~/.ssh/id_ed25519`
+(or `id_rsa` when Ed25519 is absent). Legacy agent-default nodes without a custom
+socket use the same policy. No setup button, registry import or workspace migration
+is required. Explicit file keys, schema-2 Agent choices and custom sockets remain
+available. Native connections pin and recheck the selected file and fingerprint;
+unsafe files fail rather than silently trying a different key.
 
-For small tasks, choose **Simple script with success check**. It needs no Ansible:
+## Create Multistep Playbooks
 
-```yaml
-schema: 1
-name: Simple script with success check
-tasks:
-  - name: Create and verify example directory
-    check:
-      command: test -d /tmp/ghosh-checked-example || exit 10
-    shell:
-      command: mkdir -p /tmp/ghosh-checked-example
-    timeout_s: 30
-```
+**Playbooks → New playbook** opens the whole-window Multistep Playbook editor.
+Drag step handles to reorder, or use **Move up / Move down**. Each complete step
+can expand to the whole window independently. Shell, Python and Deno code has
+offline highlighting, keyword and construction completion (functions, loops and
+classes), with Shell/Python syntax diagnostics and bundled TypeScript checks.
 
-**Check** reports exit 0 as satisfied and exit 10 as drift. Other exits fail.
-**Apply** checks first, runs the script only for drift, then repeats the check to
-verify success. This example is idempotent. Use a read-only check that actually
-verifies the result you need. Explicit retries, `creates`/`unless`, `changed_when`
-and named deduplicated handlers are also supported.
+Each step starts a fresh process: files persist, variables and `cd` do not carry
+forward. Re-running a step repeats its code. A nonzero command or optional Shell
+success check stops later steps for that target. Step timeouts are **1–3600 seconds**
+(default 30); **-1 means no timeout**, for both code and its success check. Stop
+remains available. Interpreters must already exist on each selected machine; Deno
+is optional and is not bundled.
 
-For multiple steps, choose **Multi-step · file and success checks** in the example
-selector. It creates a directory, writes `123` to `out.txt`, then sets permissions;
-each step checks its own result. **Apply** skips already satisfied steps. Commands
-in a step run in a new shell, so repeat `cd` or use explicit paths between steps.
-`printf`/stdout and stderr appear live in **Runs**. A failed check, command or verify
-stops that target; there is no rollback. The other selected targets still execute.
+New documents live in `playbooks/<id>.steps.yml`; existing `scripts/*.steps.yml`
+remain readable and editable in place. The editor writes JSON, which is valid YAML.
+**Run all steps** or **Run step** always executes saved source. During a run, the
+compact output monitor leaves the SSH terminal usable; **Runs** can remove finished
+history while preserving active runs.
 
-A minimal two-step version of “create a file” is:
+**Import Playbook** accepts `.steps.yml`, YAML or JSON using the file picker; drag
+one file onto Playbooks to import it. Imports open as drafts for review
+and saving; they never execute automatically. **Export** on a saved Multistep
+Playbook preserves its complete source, step order, runtimes, checks and timeouts.
 
-```yaml
-schema: 1
-name: Create a file and protect it
-tasks:
-  - name: Write file
-    check:
-      command: test "$(cat "$HOME/out.txt" 2>/dev/null)" = 123 || exit 10
-    shell:
-      command: |
-        set -eu
-        printf 'Writing out.txt\n'
-        printf '123\n' > "$HOME/out.txt"
-    timeout_s: 30
-  - name: Set permissions
-    check:
-      command: test "$(ls -l "$HOME/out.txt" | cut -c1-10)" = "-rw-------" || exit 10
-    shell:
-      command: chmod 600 "$HOME/out.txt"
-    timeout_s: 30
-```
+The Examples section includes three Shell-only Multistep Playbooks (also in
+[`examples/playbooks`](examples/playbooks)):
 
-For larger workflows, use **standard Ansible YAML** or **Existing Ansible project**.
-Ansible owns its modules, roles, handlers, includes, templates and Check semantics;
-Ghosh does not translate it into the simple format. Inert validation checks the YAML
-play-list shape; upstream Ansible performs full execution validation.
+- **Successful file and checks** creates `/tmp/ghosh-playbook-example/output.txt`,
+  verifies its content and prints it; includes a step with timeout `0`.
+- **Intentional failure** exits with code 7 and skips the remaining step.
+- **Intentional timeout** gives a five-second sleep a one-second limit. Run its
+  final step separately to try `0`. Interrupted runs report Outcome unknown;
+  termination does not roll back work already done.
 
-**Scripts** / `script new` offers Shell, Python and Deno examples. IDs use 1–64
-lowercase letters, digits, hyphens or underscores, starting with a letter/digit:
-use `create-a-file` as the ID; the source remains unchanged. A space-containing ID
-shows an inline explanation and an explicit suggested correction.
+**Restore example Playbooks** recreates only missing example IDs. Edited examples
+and existing IDs are always kept. Examples are ordinary editable, removable Playbooks.
+Only multistep documents appear in Playbooks. Older scenario, Ansible and standalone
+source files remain on disk; past executions remain readable in Runs. ComfyUI Recipes
+keeps its separate workflow.
 
-The bundled Monaco editor offers syntax highlighting, completion (Ctrl+Space),
-line numbers, find (Cmd+F) and **Maximize editor**. It works offline with local
-workers and fonts. Escape first dismisses suggestions, then restores the editor;
-Cmd+S saves validated source in either RU or EN layout. Ctrl+M switches Tab between
-indentation and keyboard focus navigation. **Plain text** provides a textarea fallback.
-Unsaved source remains protected when closing the dialog.
+Step runtimes are Shell, Python and Deno. Each must already be installed on the
+execution target. Every step runs in a fresh process; use explicit paths between steps.
+Timeout `0` means no timeout for both code and its optional Shell success check;
+legacy `-1` also works. Positive limits are 1–3600 seconds. Stop remains available.
 
-Editor diagnostics use local `/bin/sh -n` for shell and Python `ast.parse` without
-executing source. YAML checks the supported document structure; TypeScript uses
-Monaco's bundled language service with basic Deno declarations. These are editor
-checks, not full remote linting or runtime compatibility guarantees. Missing local
-interpreters are reported. **Validate/Save** applies native structural/source limits. The installed runtime executes on each target;
-exit 0 means success and a nonzero exit means failure. Use `set -eu` in shell scripts
-or raise an exception/exit nonzero in Python/JavaScript when a result is invalid.
-Optional non-secret JSON inputs arrive as `GHOSH_INPUT`. Use the checked-scenario
-format above when you need a separate post-execution verification step.
+The offline Monaco editor provides highlighting, Ctrl+Space keyword/construction
+completion, line numbers and find. Expand a step independently of the whole-window
+Playbook editor. Escape dismisses suggestions, then restores an expanded step/editor.
+Cmd+S saves in RU and EN layouts. Ctrl+M switches Tab indentation/focus navigation;
+**Plain text** provides a textarea fallback.
+
+Save performs structural checks and atomic persistence in one action. Syntax warnings
+from local Shell/Python or TypeScript diagnostics do not block Save; no step runs
+while saving. Invalid fields are reported without discarding the draft. IDs use
+1–64 lowercase letters, digits, hyphens or underscores, starting with a letter/digit.
+
+The following Ansible controller notes describe existing saved integrations and Recipes.
 
 ## Set up the Ansible controller
 
@@ -331,31 +316,22 @@ server-first-run certificate renewal/distribution and timer acceptance remain pe
 
 ## Run and inspect results
 
-1. Save a simple scenario or Ansible playbook, then **Run**, select up to eight
-   targets and **Check** or **Apply**. Fill the controller Python path for Ansible;
-   leave it empty for simple scenarios. **Inspect Linux node** is a standard Ansible
-   read-only example for Debian/node3; **Create a temporary directory** uses its file module.
-2. Standard Ansible Check uses `--check`; modules/tasks can still run when their own
-   check-mode rules allow it. Apply uses normal module idempotence and changed/failed
-   results. Simple scenarios instead use the check/script/verify contract above.
-3. Scripts support **Execute script**. Shell/Python/Deno must already exist on the
-   selected target. Deno reports its version and runs without prompts, project config,
-   lock writes or dependency downloads, with only GHOSH_INPUT and hostname access.
-   Configurable network/file/subprocess permissions remain future work.
-4. Optional non-secret JSON object inputs become Ansible extra variables or the
-   `GHOSH_INPUT` environment variable. Connection/inventory override variables are
-   rejected. Result bindings, arbitrary artifacts and secret-input broker remain pending.
-5. **Runs** shows the current node/step/phase, overall progress, followable live
-   output, persistent task/phase results, exit status and **Stop run**. Simple
-   scenarios count tasks × targets; check/apply/verify and retries do not count as
-   extra steps. Ansible shows completed task events with indeterminate progress,
-   because dynamic includes/handlers prevent a reliable fixed total. A single script
-   is one step per target; Ghosh cannot estimate progress inside that command. **Export results · JSON** saves the stored report. Targets execute
-   sequentially and only one automation run is active. Cmd+K `run plan` / `run apply`
-   opens the first runnable playbook's target form.
+Save a multistep Playbook, then run all steps or one saved step. Choose local or
+configured SSH targets. Execution stops at the first failed step/check. Exit 0 means
+success; use a nonzero exit when a result is invalid. Optional non-secret JSON inputs
+arrive as `GHOSH_INPUT`; Deno uses restricted runtime permissions.
+
+**Runs** contains current executions and past results only. It shows current step,
+node, output, Stop, JSON export and finished-history cleanup. Start runs in Playbooks.
+Targets execute sequentially; only one automation run is active. A running step has
+indeterminate progress until it finishes, so its progress bar does not imply zero work.
+Older Ansible/scenario reports remain readable and exportable.
 
 Navigate to Nodes, Terminal or another section while a run continues. The footer
-shows the active run; click it to return to logs. **Keep Ghosh open**: there is no
+shows the active run; click it for a compact live output panel. Minimize it without
+stopping the task, or choose **Open full run**. You can open an independent SSH shell
+and type commands while automation runs. Remove a finished report or use **Clear
+finished runs** in Runs; cleanup keeps active runs. **Keep Ghosh open**: there is no
 background daemon or continuation after quitting. Editing/switching/closing the
 workspace remains blocked during a run; reading other sections and terminals works.
 
@@ -368,7 +344,7 @@ group; remote stop, timeout or disconnect may leave **Outcome unknown**. Complet
 changes remain applied. Interrupted or crashed runs are never replayed automatically.
 
 Reports are private application-local files under `runs/`, scoped to workspace ID.
-The UI lists the latest 100; retention cleanup is pending. Local/SSH commands publish both output streams during execution; the UI refreshes
+The UI lists the latest 100; finished-history cleanup also covers older records. Local/SSH commands publish both output streams during execution; the UI refreshes
 about every 600 ms. Programs may buffer their own output (Python runs unbuffered).
 Ansible publishes filtered task events instead of raw process stdout. Live previews
 are memory-only; completed phases and final reports are saved. Live masking may
@@ -631,3 +607,30 @@ are maintained for future agents. The full target architecture and later service
 are specifications, not claims of implemented behavior.
 
 Licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
+
+Notebook/background-run browser evidence (IPC fixtures; layout also checked at 200% zoom):
+
+![Notebook cells](docs/evidence/ui-shell/40-notebook-fixture.png)
+
+![Modeless background output](docs/evidence/ui-shell/41-background-monitor-fixture.png)
+
+Current verification: 96 Rust tests and 38 sequential browser workflows pass.
+Read-only native acceptance on OrbStack Linux and node3 separately proves saved
+Shell/Python cells, optional success checks and an independent interactive SSH
+shell during execution. System-key defaults are also covered by native connection and identity-pinning checks.
+
+## Monitor and terminal shortcuts
+
+Monitor replaces Scripts. Select the local machine or a configured node, connect,
+and explicitly run a journal, kernel, macOS or custom log command. Resource probes
+sample CPU, memory and root disk usage every five seconds while visible. Missing
+measurements show Unavailable. Logs retain the latest 64 KiB in memory, independently
+of Playbook runs and terminal sessions. No tools are installed and no sudo is added.
+Stop disconnects the Monitor; local process groups are killed and reaped. Remote
+command termination depends on the SSH server. Workspace changes cancel monitoring.
+
+Each Terminal session has an X. Cmd+W confirms closing the selected session and
+leaves Terminal open after the last session. Cmd+Shift+[ / ] cycles sessions and
+focuses the shell; Cmd+[ / ] cycles application tabs. Hold Cmd+Option for the shortcut
+overlay; release either modifier, Escape or blur hides it. Commands → Keyboard
+shortcuts opens a persistent searchable list.

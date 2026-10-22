@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "../../app/ipc";
 import { Dialog } from "../../components/Dialog";
 import { Select } from "../../components/Select";
-import type { AutomationSummary, NodeConnectionPreview, RunMode, RunTarget, WorkspaceSnapshot } from "../../generated/contracts";
+import type { AutomationSummary, NodeConnectionPreview, RunMode, RunTarget, Notebook, WorkspaceSnapshot } from "../../generated/contracts";
 
-export function RunDialog({ workspace, item, initialMode, dismiss, started, busyChanged }: {
+export function RunDialog({ workspace, item, initialMode, initialCells = [], dismiss, started, busyChanged }: {
   workspace: WorkspaceSnapshot; item: AutomationSummary; initialMode: RunMode;
+  initialCells?: string[]; update: (workspace: WorkspaceSnapshot) => void;
   dismiss: () => void; started: () => void; busyChanged: (busy: boolean) => void;
 }) {
+  const [cells, setCells] = useState(initialCells), [notebook, setNotebook] = useState<Notebook | null>(null);
+  useEffect(() => { let alive = true; if (item.kind === "notebook") void api.automationRead({ context: { workspace_id: workspace.id, revision: workspace.revision }, id: item.id, kind: item.kind }).then(document => api.notebookParse(document.source)).then(value => { if (alive) setNotebook(value); }).catch(e => { if (alive) setError(errorMessage(e)); }); return () => { alive = false; }; }, []);
   const playbook = item.kind === "playbook" || item.kind === "ansible";
   const [python, setPython] = useState(() => localStorage.getItem("ghosh.controller.python") || "");
   const [revision] = useState(workspace.revision);
@@ -39,7 +42,7 @@ export function RunDialog({ workspace, item, initialMode, dismiss, started, busy
       }
       if (required.length) { setPrompts(required); return; }
       connecting = "";
-      await api.runStart({ automation: { context, id: item.id, kind: item.kind }, targets: connections, mode, input, controller_python: python || null });
+      await api.runStart({ cells, automation: { context, id: item.id, kind: item.kind }, targets: connections, mode, input, controller_python: python || null });
       setCredentials({}); started();
     } catch (e) { setCredentials({}); setPrompts([]); setFailedTarget(connecting); setError(errorMessage(e)); }
     finally { inFlight.current = false; setBusy(false); }
@@ -47,12 +50,14 @@ export function RunDialog({ workspace, item, initialMode, dismiss, started, busy
   return <Dialog title="run-title" busy={busy} dismiss={dismiss}><form onSubmit={e => { e.preventDefault(); void submit(); }}>
     <p className="eyebrow">SEQUENTIAL EXECUTION</p><h2 id="run-title">Run {item.validation.name}</h2>
     <label htmlFor="run-mode">Mode</label><Select id="run-mode" data-dialog-focus value={mode} disabled={busy || !!prompts.length} onChange={e => setMode(e.target.value as RunMode)}>
-      {playbook && <option value="check">Check · report drift</option>}<option value="apply">{playbook ? "Apply playbook" : "Execute script"}</option>
+      {playbook && <option value="check">Check · inspect only</option>}<option value="apply">{playbook ? "Apply · make changes" : item.kind === "notebook" ? "Run Playbook" : "Execute script"}</option>
     </Select>
+    {playbook && <p className="notice">{mode === "check" ? "Check inspects state and reports changes needed. Simple scenarios do not run their write commands until you choose Apply." : "Apply runs commands that make changes and verifies success."}</p>}
+    {notebook && <label>Saved steps<Select aria-label="Steps to run" disabled={busy} value={cells[0] || ""} onChange={e => setCells(e.target.value ? [e.target.value] : [])}><option value="">Run all steps in saved order</option>{notebook.cells.map(cell => <option key={cell.id} value={cell.id}>{cell.title}</option>)}</Select></label>}
     {playbook && <><label htmlFor="controller-python">Ansible controller · absolute Python path</label><input id="controller-python" placeholder="/path/to/controller/bin/python" value={python} disabled={busy || !!prompts.length} onChange={e => setPython(e.target.value)} /><p className="field-help">Leave empty for simple schema: 1 scenarios; they need no Ansible. Standard Ansible requires Python 3.12+ with requirements-controller.txt installed. This path is saved on this machine.</p></>}
     <fieldset disabled={busy || !!prompts.length} className="run-targets"><legend>Targets · choose up to eight</legend>{[{ id: "@local", host: "This machine" }, ...workspace.nodes].map(node => <label key={node.id} title={node.host}><input type="checkbox" checked={targets.includes(node.id)} onChange={e => setTargets(current => e.target.checked ? [...current, node.id] : current.filter(id => id !== node.id))} /><span>{node.id === "@local" ? "Local machine" : node.id}<small>{node.host}</small></span></label>)}</fieldset>
     <label htmlFor="run-input">Inputs · JSON object</label><textarea id="run-input" rows={3} spellCheck={false} value={input} disabled={busy || !!prompts.length} onChange={e => setInput(e.target.value)} />
-    <p className="field-help">Non-secret inputs become Ansible extra variables, or GHOSH_INPUT for scripts. Output is stored locally in Runs; scripts must not print secrets. Ansible Check uses --check; tasks and plugins may still execute according to your playbook. Stop does not undo completed changes.</p>
+    <p className="field-help">{item.kind === "notebook" ? "Non-secret inputs are available as GHOSH_INPUT in each step. Output is stored locally in Runs. Stop does not undo completed changes." : "Non-secret inputs become Ansible extra variables. Output is stored locally in Runs. Ansible Check uses --check; tasks and plugins may still execute according to your Playbook. Stop does not undo completed changes."}</p>
     {prompts.map(prompt => <div key={prompt.node_id}><label htmlFor={`run-credential-${prompt.node_id}`}>{prompt.node_id} · {prompt.credential_prompt}</label><input id={`run-credential-${prompt.node_id}`} type="password" autoComplete="off" maxLength={4096} disabled={busy} value={credentials[prompt.node_id] || ""} onChange={e => setCredentials(current => ({ ...current, [prompt.node_id]: e.target.value }))} /></div>)}
     {!!prompts.length && <p className="field-help">SSH credentials are used only for this run and are never saved.</p>}
     {stale && <p className="form-error" role="alert">Reload or resume the workspace before running.</p>}{error && <p className="form-error" role="alert">{failedTarget && <strong>{failedTarget}: </strong>}{error}</p>}

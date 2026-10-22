@@ -1,10 +1,10 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 
 // Browser-only deterministic IPC fixture. This does not exercise native services.
-async function fixture(page: Page, trusted = true, unknown = false, credential = false) {
+async function fixture(page: Page, trusted = true, unknown = false, credential = false, schema = 1) {
   await page.route("**/", async route => {
     const response = await route.fetch();
-    const body = (await response.text()).replace('<script type="module" src="/src/main.tsx"></script>', `<script type="module">
+    const body = (await response.text()).replace(/<script type="module" src="\/src\/main\.tsx(?:\?[^"]*)?"><\/script>/, `<script type="module">
       import { mockIPC, mockWindows } from '/node_modules/@tauri-apps/api/mocks.js';
       window.isTauri = true; mockWindows('main');
       window.fixtureCalls = [];
@@ -14,7 +14,7 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
       window.fixtureAutomations = [];
       window.fixtureRuns = [];
       window.fixtureKeys = {revision:'keys-1',default_key:null,keys:[]};
-      window.fixtureWorkspace = { id: 'fixture', name: 'Test fleet', path: '/tmp/Test.ghosh', revision: 'r1', schema: 1, read_only: false, trusted: ${trusted}, external_changed: false, notices: [], nodes: [
+      window.fixtureWorkspace = { id: 'fixture', name: 'Test fleet', path: '/tmp/Test.ghosh', revision: 'r1', schema: ${schema}, read_only: false, trusted: ${trusted}, external_changed: false, notices: [], nodes: [
         {id:'edge1',host:'192.0.2.1',port:22,user:'admin',labels:['web']}, {id:'db1',host:'192.0.2.2',port:22,user:'deploy',labels:['database']}
       ]};
       window.fixtureSavedWorkspace = structuredClone(window.fixtureWorkspace);
@@ -22,6 +22,11 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
       window.fixtureOperations = { jobs: { sequence: 1, jobs: [{id:'job-1',kind:'workspace_open',state:'succeeded',cancellable:false,started_at:Date.now(),finished_at:Date.now(),error:null,stages:['started','completed']}] }, approvals: { sequence: 1, requests: [], audit: [] } };
       mockIPC(async (cmd, args) => {
         window.fixtureCalls.push(cmd);
+        if (cmd === 'playbook_export') { window.fixtureExport = structuredClone(args.document); return true; }
+        if (cmd === 'playbook_import') return structuredClone(window.fixtureImport || null);
+        if (cmd === 'notebook_parse') return JSON.parse(args.source);
+        if (cmd === 'system_key_candidates') return ['System Ed25519','OrbStack Linux'].map((label,i)=>({request:{label,path:i?'/fixture/.orbstack/ssh/id_ed25519':'/fixture/.ssh/id_ed25519',storage:'reference'},digest:'review-'+i,public:{algorithm:'ED25519',fingerprint:'SHA256:system-'+i},encrypted:false}));
+        if (cmd === 'runs_cleanup') {const before=window.fixtureRuns.length;window.fixtureRuns=window.fixtureRuns.filter(run=>run.state==='running'||(args.request.id&&run.id!==args.request.id));return before-window.fixtureRuns.length;}
         if (cmd === 'runs_list') return structuredClone(window.fixtureRuns);
         if (cmd === 'run_start') {const request=args.request;const report={id:'run-fixture',job_id:'execution-job',workspace_id:'fixture',revision:request.automation.context.revision,automation_id:request.automation.id,kind:request.automation.kind,mode:request.mode,targets:request.targets.map(target=>target.node_id),state:'running',started_at:Date.now(),finished_at:null,results:[],message:'Targets execute sequentially.'};window.fixtureRunRequest=structuredClone(request);window.fixtureRuns=[report];window.fixtureOperations.jobs.jobs.push({id:'execution-job',kind:'automation_run',state:'running',cancellable:true,started_at:Date.now(),finished_at:null,error:null,stages:['started']});return structuredClone(report);}
         if (cmd === 'run_stop') {window.fixtureRuns[0].state='outcome_unknown';window.fixtureRuns[0].message='Inspect the node before retrying.';window.fixtureRuns[0].results=[{node_id:'edge1',name:'Ensure',phase:'apply',state:'outcome_unknown',output:'very-long-output-'.repeat(120),exit_code:null,truncated:false}];window.fixtureOperations.jobs.jobs.find(job=>job.id==='execution-job').state='cancelled';return null;}
@@ -31,6 +36,10 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
         if (cmd === 'terminal_open_local') return {id:'pty-fixture-'+(++window.fixtureTerminalCount),target:'Local machine',shell:'/bin/zsh',cwd:'/fixture/home'};
         if (cmd === 'terminal_poll') {window.fixtureTerminalAck.push(args.ack); return args.ack === 0 ? {sequence:1,bytes:Array.from(new TextEncoder().encode('REAL_PTY_FIXTURE 世界\\r\\n')),exited:false,exit_code:null,failed:false} : {sequence:1,bytes:[],exited:false,exit_code:null,failed:false};}
         if (cmd === 'terminal_input') {window.fixtureTerminalInput.push(...args.bytes);window.fixtureLastInputSession=args.id;return null;}
+        if (cmd === 'monitor_open') {window.fixtureMonitorRequest=args.request;return {id:'monitor-fixture',target:args.request.connection?'edge1':'Local machine'};}
+        if (cmd === 'monitor_poll') {window.fixtureMonitorVisible=args.visible;return {output:window.fixtureMonitorOutput||'',running:!!window.fixtureMonitorRunning,exit_code:null,truncated:false,metrics:{cpu_percent:12.5,memory_percent:40,disk_percent:23}};}
+        if (cmd === 'monitor_start') {window.fixtureMonitorCommand=args.command;window.fixtureMonitorRunning=true;window.fixtureMonitorOutput='monitor live fixture';return null;}
+        if (cmd === 'monitor_close') {window.fixtureMonitorRunning=false;return null;}
         if (cmd === 'terminal_resize' || cmd === 'terminal_close') return null;
         if (cmd === 'workspace_key') return window.fixtureWorkspace.default_key || null;
         if (cmd === 'workspace_key_preview') return {digest:'migration-review',before_schema:window.fixtureWorkspace.schema,before_default:null,after_default:args.request.default_key,backup:'.ghosh-manifest-r1.backup',legacy_nodes:['old-key-node']};
@@ -43,7 +52,7 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
         if (cmd === 'keys_commit') {
           if (args.request.revision !== window.fixtureKeys.revision) throw {code:'conflict',message:'The key library changed. Refresh keys and review again.'};
           const review = args.request.preview;
-          window.fixtureKeys.keys.push({id:'key-fixture',label:review.request.label,path:review.request.path,storage:review.request.storage,public:review.public,encrypted:review.encrypted,status:'available'});
+          window.fixtureKeys.keys.push({id:window.fixtureKeys.keys.length?'key-fixture-'+window.fixtureKeys.keys.length:'key-fixture',label:review.request.label,path:review.request.path,storage:review.request.storage,public:review.public,encrypted:review.encrypted,status:'available'});
           window.fixtureKeys.revision += '-save'; return structuredClone(window.fixtureKeys);
         }
         if (cmd === 'keys_default') { window.fixtureKeys.default_key = args.request.id; window.fixtureKeys.revision += '-default'; return structuredClone(window.fixtureKeys); }
@@ -59,9 +68,9 @@ async function fixture(page: Page, trusted = true, unknown = false, credential =
         if (cmd === 'automations_list') return structuredClone(window.fixtureAutomations.map(document => ({id:document.id,kind:document.kind,validation:{valid:true,name:document.id,task_count:1,issues:[]}})));
         if (cmd === 'automation_lint') return {engine:'Fixture syntax diagnostics',diagnostics:args.document.source.includes('if then')?[{line:1,column:1,message:'Expected condition'}]:[]};
         if (cmd === 'automation_read') return structuredClone(window.fixtureAutomations.find(document => document.id === args.request.id && document.kind === args.request.kind));
-        if (cmd === 'automation_preview') {const valid = args.request.remove || (args.request.document.source.includes('schema: 1') || args.request.document.source.includes('hosts: all')) || ['shell','python','deno'].includes(args.request.document.kind);return {digest:'automation-fixture',validation:{valid,name:args.request.document.id,task_count:1,issues:valid?[]:['Invalid native YAML.']}};}
+        if (cmd === 'automation_preview') {const valid = args.request.remove || (args.request.document.source.includes('schema: 1') || args.request.document.source.includes('hosts: all')) || ['shell','python','deno','notebook'].includes(args.request.document.kind);return {digest:'automation-fixture',validation:{valid,name:args.request.document.id,task_count:1,issues:valid?[]:['Invalid native YAML.']}};}
         if (cmd === 'automation_commit') {const mutation=args.request.mutation;window.fixtureAutomations=window.fixtureAutomations.filter(document => document.id !== mutation.document.id || document.kind !== mutation.document.kind);if(!mutation.remove)window.fixtureAutomations.push(structuredClone(mutation.document));window.fixtureWorkspace.revision+='-automation';return structuredClone(window.fixtureWorkspace);}
-        if (cmd === 'nodes_list') return window.fixtureWorkspace.nodes.map(node => ({...node,schema:1,auth:{method:'agent',key_ref:null,password_ref:null,agent_socket:null},tunnel:'direct',jump:null}));
+        if (cmd === 'nodes_list') return window.fixtureWorkspace.nodes.map(node => ({...node,schema:node.schema||1,auth:node.auth||{method:'agent',key_ref:null,key_id:null,password_ref:null,agent_socket:null},tunnel:node.tunnel||'direct',jump:node.jump||null}));
         if (cmd === 'nodes_preview') {
           const change = args.request.change;
           const before = window.fixtureWorkspace.nodes.find(node => node.id === (change.node?.id || change.id)) || null;
@@ -258,6 +267,42 @@ test("native jobs snapshot and approval review are keyboard accessible; stale sn
   await expect(page.getByRole("heading", {name:"No approval requests"})).toBeVisible();
 });
 
+test("node IDs validate before review and preserve uppercase names and jump references", async ({ page }) => {
+  await fixture(page);
+  await command(page, "node add");
+  const modal = page.getByRole("dialog", { name: "Add node", exact: true });
+  const id = modal.getByLabel("Node ID", { exact: true });
+  await modal.getByLabel("Host", { exact: true }).fill("192.0.2.30");
+  await modal.getByLabel("SSH user", { exact: true }).fill("ops");
+  for (const invalid of ["_GPU", "-GPU", "GPU name", "../GPU", "GПU"]) {
+    await id.fill(invalid);
+    await modal.getByRole("button", { name: "Review change" }).click();
+    await expect(modal).toBeVisible();
+    expect(await id.evaluate((input: HTMLInputElement) => input.validity.patternMismatch)).toBe(true);
+  }
+  expect(await page.evaluate(() => (window as unknown as {fixtureCalls:string[]}).fixtureCalls.includes("nodes_preview"))).toBe(false);
+  await id.fill("A".repeat(64));
+  expect(await id.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
+  await id.fill("RTX3070");
+  await modal.getByRole("button", { name: "Review change" }).click();
+  const review = page.getByRole("alertdialog", { name: "Review node change" });
+  await expect(review).toContainText("Save RTX3070 in this workspace.");
+  await review.getByRole("button", { name: "Save node", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Edit RTX3070", exact: true })).toBeVisible();
+  await command(page, "node add");
+  await id.fill("Worker_1-GPU");
+  await modal.getByLabel("Host", { exact: true }).fill("192.0.2.31");
+  await modal.getByLabel("SSH user", { exact: true }).fill("ops");
+  await modal.getByLabel("Jump node ID (optional)").fill("RTX3070");
+  await modal.getByRole("button", { name: "Review change" }).click();
+  await expect(review.getByRole("row", { name: "Jump node — RTX3070" })).toBeVisible();
+  await review.getByRole("button", { name: "Save node", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Worker_1-GPU", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit node", exact: true });
+  await expect(edit.getByLabel("Node ID", { exact: true })).toHaveValue("Worker_1-GPU");
+  await expect(edit.getByLabel("Jump node ID (optional)")).toHaveValue("RTX3070");
+});
+
 test("node drafts review exact changes, preserve workspace draft, and block stale commits", async ({ page }) => {
   await fixture(page);
   await page.getByLabel("Workspace name", { exact: true }).fill("Keep overview draft");
@@ -359,8 +404,21 @@ test("key generation and workspace migration require explicit keyboard review", 
   await expect(migration).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as {fixtureWorkspace:{schema:number;default_key:string}}).fixtureWorkspace.schema)).toBe(2);
   await command(page, "node add");
+  await expect(page.getByLabel("Authentication", {exact:true})).toHaveText("System keys (default)");
   await choose(page.getByLabel("Authentication", {exact:true}), "File key");
+  await expect(page.getByLabel("SSH identity", {exact:true})).toHaveText("Inherit workspace / global default");
   await expect(page.getByText(/Workspace: SHA256:generated-fixture/)).toBeVisible();
+  await page.getByLabel("Node ID", {exact:true}).fill("inherited");
+  await page.getByLabel("Host", {exact:true}).fill("192.0.2.30");
+  await page.getByLabel("SSH user", {exact:true}).fill("ops");
+  await page.keyboard.press("Meta+s");
+  const nodeReview = page.getByRole("alertdialog", {name:"Review node change"});
+  await expect(nodeReview).toContainText("Identity: workspace · SHA256:generated-fixture");
+  await nodeReview.getByRole("button", {name:"Save node",exact:true}).click();
+  const saved = await page.evaluate(() => (window as any).fixtureWorkspace.nodes.find((node: any) => node.id === "inherited"));
+  expect(saved.schema).toBe(2);
+  expect(saved.auth.method).toBe("key");
+  expect(saved.auth.key_id).toBeNull();
 });
 
 test("relink reviews the existing fingerprint and returns focus without creating a new identity", async ({ page }) => {
@@ -401,7 +459,7 @@ test("terminal requires explicit open, preserves control keys and reviews multil
   await expect.poll(() => page.evaluate(() => String.fromCharCode(...(window as any).fixtureTerminalInput))).toContain("echo reviewed");
   await page.keyboard.press("Meta+k"); await expect(page.getByRole("dialog",{name:"Command popup"})).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.keyboard.press("Meta+w"); await expect(page.getByRole("alertdialog")).toContainText("Terminate terminal sessions");
+  await page.keyboard.press("Meta+w"); await expect(page.getByRole("alertdialog")).toContainText("Terminate terminal session?");
   await page.keyboard.press("Tab"); await page.keyboard.press("Enter");
   await expect.poll(() => page.evaluate(() => (window as any).fixtureCalls.includes("terminal_close"))).toBe(true);
 });
@@ -418,10 +476,11 @@ test("terminal cleanup reviews workspace changes and closes the last terminal ta
   await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
   await page.getByRole("button", {name:"Close Overview tab",exact:true}).focus(); await page.keyboard.press("Enter");
   await expect(page.getByRole("tab")).toHaveCount(1);
+  await page.getByRole("tab", {name:"Terminal",exact:true}).click();
   await page.keyboard.press("Meta+w");
-  await page.keyboard.press("Tab"); await page.keyboard.press("Enter");
-  await expect(page.getByRole("tab", {name:"Overview",exact:true})).toBeVisible();
-  await expect(page.getByRole("tab", {name:"Terminal",exact:true})).toHaveCount(0);
+  await page.getByRole("button", {name:"Terminate session",exact:true}).click();
+  await expect(page.getByRole("tab", {name:"Terminal",exact:true})).toBeVisible();
+  await expect(page.getByRole("button", {name:"Open local terminal",exact:true})).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as any).fixtureCalls.includes("terminal_close"))).toBe(true);
 });
 
@@ -431,7 +490,7 @@ test("split terminals fit both panes inside the available content width", async 
     await command(page, "terminal open");
     await expect(page.getByRole("dialog").getByRole("button", {name:"Cancel",exact:true})).toBeFocused();
     await page.keyboard.press("Tab"); await page.keyboard.press("Enter");
-    await expect(page.getByRole("group", {name:"Terminal sessions"}).getByRole("button")).toHaveCount(i + 1);
+    await expect(page.getByRole("group", {name:"Terminal sessions"}).getByRole("button")).toHaveCount((i + 1)*2);
   }
   await page.keyboard.press("Meta+f");
   await page.keyboard.press("Tab"); await page.keyboard.press("Tab"); await page.keyboard.press("Space");
@@ -518,7 +577,7 @@ test("number shortcuts use displayed tab order and icons open actual jobs and ap
   await page.keyboard.press("Meta+2"); await expect(page.getByRole("tab",{name:"Background jobs",exact:true})).toHaveAttribute("aria-selected","true");
   await page.keyboard.press("Meta+1"); await expect(page.getByLabel("Workspace name",{exact:true})).toBeVisible();
   await command(page,"keyboard");
-  await expect(page.locator(".shift-key").first()).toBeVisible();
+  await expect(page.locator("dialog .shift-key").first()).toBeVisible();
 });
 
 test("node header has mixed state, filtered select-all preserves hidden selection, and controls align", async ({ page }) => {
@@ -662,74 +721,60 @@ test("node terminal command is clickable and offers configured nodes", async ({ 
 });
 
 
-test("playbook and script editors validate, save exact source, reopen and protect drafts", async ({ page }) => {
+test("Playbooks save syntax warnings immediately and retain unsaved drafts", async ({ page }) => {
   await fixture(page);
   await command(page, "playbook new");
   const dialog = page.getByRole("dialog", { name: "Create playbook" });
-  await expect(dialog.getByLabel("ID", { exact: true })).toBeFocused();
-  await dialog.getByRole("button", { name: "Plain text", exact: true }).click();
-  const source = dialog.getByLabel("Source", { exact: true });
-  const original = await source.inputValue();
-  expect(original).toContain("check:");
-  expect(original).toContain("mkdir -p /tmp/ghosh-checked-example");
-  await source.fill("invalid yaml");
-  await dialog.getByRole("button", { name: "Validate", exact: true }).click();
-  await expect(dialog.getByRole("status").filter({ hasText: "Invalid native YAML" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
-  const exactSource = original + "\n# preserve this comment 世界\n";
-  await source.fill(exactSource);
-  await dialog.getByRole("button", { name: "Validate", exact: true }).click();
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await dialog.getByLabel("ID", { exact: true }).fill("checked-playbook");
+  await expect(dialog.getByLabel("Format", {exact:true})).toHaveCount(0);
+  await expect(dialog.getByRole("button", {name:"Validate",exact:true})).toHaveCount(0);
+  await dialog.getByRole("button", {name:"Plain text",exact:true}).click();
+  const code = "if then\n# preserve 世界";
+  await dialog.getByRole("textbox", {name:"Source",exact:true}).fill(code);
+  await dialog.getByLabel("Timeout (seconds; 0 = none)").fill("0");
+  const runtime = await dialog.getByRole("combobox", {name:"Runtime",exact:true}).boundingBox();
+  const timeout = await dialog.getByLabel("Timeout (seconds; 0 = none)").boundingBox();
+  expect(Math.abs(runtime!.y-timeout!.y)).toBeLessThan(2);
+  expect(Math.abs(runtime!.height-timeout!.height)).toBeLessThan(2);
+  await dialog.getByRole("button", {name:"Save",exact:true}).click();
   await expect(dialog).not.toBeVisible();
-  await page.getByRole("button", { name: "Edit checked-script", exact: true }).click();
-  const edit = page.getByRole("dialog", { name: "Edit playbook" });
-  await edit.getByRole("button", { name: "Plain text", exact: true }).click();
-  await expect(edit.getByLabel("Source", { exact: true })).toHaveValue(exactSource);
-  await edit.getByLabel("Source", { exact: true }).fill(exactSource + "# changed");
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", {name:"Edit checked-playbook",exact:true}).click();
+  const edit = page.getByRole("dialog", {name:"Edit playbook"});
+  await edit.getByRole("button", {name:"Plain text",exact:true}).click();
+  await expect(edit.getByRole("textbox", {name:"Source",exact:true})).toHaveValue(code);
+  await edit.getByRole("textbox", {name:"Source",exact:true}).fill(code+"\n# changed");
+  await edit.getByRole("button", {name:"Restore Playbook",exact:true}).click();
+  await edit.getByRole("button", {name:"Cancel",exact:true}).click();
   await expect(edit).toContainText("Discard this unsaved draft?");
-  await edit.getByRole("button", { name: "Keep editing", exact: true }).click();
-  await expect(edit.getByLabel("Source", { exact: true })).toHaveValue(exactSource + "# changed");
-  await page.keyboard.press("Escape");
-  await edit.getByRole("button", { name: "Discard draft", exact: true }).click();
-  await command(page, "script new");
-  const script = page.getByRole("dialog", { name: "Create script" });
-  await script.getByRole("button", { name: "Plain text", exact: true }).click();
-  await choose(script.getByLabel("Format", { exact: true }), "Deno · JS / TS");
-  await expect(script.getByLabel("Source", { exact: true })).toHaveValue(/Deno.hostname/);
-  await script.getByRole("button", { name: "Validate", exact: true }).click();
-  await script.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(script).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "Edit system-report", exact: true })).toBeVisible();
+  await edit.getByRole("button", {name:"Keep editing",exact:true}).click();
+  await expect(edit.getByRole("textbox", {name:"Source",exact:true})).toHaveValue(code+"\n# changed");
 });
 
-test("script ID correction is explicit and keeps the user's shell source", async ({ page }) => {
+test("Playbook ID correction keeps step code", async ({ page }) => {
   await fixture(page);
-  await command(page, "script new");
-  const dialog = page.getByRole("dialog", { name: "Create script" });
+  await command(page, "playbook new");
+  const dialog = page.getByRole("dialog", {name:"Create playbook"});
   const source = "#!/bin/sh\ncd ~\necho '123' > out.txt\n";
-  await dialog.getByRole("button", { name: "Plain text", exact: true }).click();
-  await dialog.getByLabel("Source", { exact: true }).fill(source);
-  await dialog.getByLabel("ID", { exact: true }).fill("create a file");
-  await expect(dialog.getByLabel("ID", { exact: true })).toHaveAttribute("aria-invalid", "true");
-  await expect(dialog.getByRole("button", { name: "Validate", exact: true })).toBeDisabled();
-  expect(await page.evaluate(() => (window as any).fixtureCalls.includes("automation_preview"))).toBe(false);
-  await dialog.getByRole("button", { name: "Use create-a-file", exact: true }).click();
-  await expect(dialog.getByLabel("Source", { exact: true })).toHaveValue(source);
-  await dialog.getByRole("button", { name: "Validate", exact: true }).click();
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await page.getByRole("button", { name: "Edit create-a-file", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Plain text", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Edit script" }).getByLabel("Source", { exact: true })).toHaveValue(source);
+  await dialog.getByRole("button", {name:"Plain text",exact:true}).click();
+  await dialog.getByRole("textbox", {name:"Source",exact:true}).fill(source);
+  await dialog.getByLabel("ID", {exact:true}).fill("create a file");
+  await expect(dialog.getByLabel("ID", {exact:true})).toHaveAttribute("aria-invalid","true");
+  await expect(dialog.getByRole("button", {name:"Save",exact:true})).toBeDisabled();
+  await dialog.getByRole("button", {name:"Use create-a-file",exact:true}).click();
+  await expect(dialog.getByRole("textbox", {name:"Source",exact:true})).toHaveValue(source);
+  await dialog.getByRole("button", {name:"Save",exact:true}).click();
+  await page.getByRole("button", {name:"Edit create-a-file",exact:true}).click();
+  await page.getByRole("dialog").getByRole("button", {name:"Plain text",exact:true}).click();
+  await expect(page.getByRole("dialog").getByRole("textbox", {name:"Source",exact:true})).toHaveValue(source);
 });
 
 test("SSH agent failure identifies the target and allows retry with retained targets", async ({ page }) => {
   await fixture(page);
   await page.evaluate(() => {
-    (window as any).fixtureAutomations = [{ id: "facts", kind: "shell", source: "uname -a" }];
+    (window as any).fixtureAutomations = [{ id: "facts", kind: "notebook", source: JSON.stringify({schema:1,name:"Facts",cells:[{id:"first",title:"Facts",runtime:"shell",code:"uname -a",timeout_s:0,success_check:null}]}) }];
     (window as any).fixtureConnectionError = { node: "db1", error: { code: "agent_unavailable", message: "The SSH agent is unavailable. Load a key or choose File key authentication." } };
   });
-  await page.getByRole("navigation").getByRole("button", { name: "Scripts", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Playbooks", exact: true }).click();
   await page.getByRole("button", { name: "Run facts", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: /^Run / });
   await dialog.getByRole("checkbox", { name: /db1/ }).check();
@@ -755,30 +800,20 @@ test("inventory terminal opens directly once without approval", async ({ page })
   expect(await page.evaluate(() => (window as any).fixtureTerminalCount)).toBe(1);
 });
 
-test("saved scenario runs on explicit targets without SSH confirmation and can stop", async ({ page }) => {
+test("saved multistep Playbook runs on explicit targets and can stop", async ({ page }) => {
   await fixture(page);
-  await page.evaluate(() => {
-    (window as any).fixtureAutomations = [{ id: "facts", kind: "playbook", source: "schema: 1" }];
-  });
-  await command(page, "run plan");
-  const dialog = page.getByRole("dialog", { name: /^Run / });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel("Mode", { exact: true })).toContainText("Check");
-  await dialog.getByRole("checkbox", { name: /db1/ }).check();
-  await dialog.getByRole("button", { name: "Start check", exact: true }).click();
+  await command(page, "playbook new");
+  await page.getByRole("dialog").getByRole("button", {name:"Save",exact:true}).click();
+  await page.getByRole("button", {name:"Run multi-step",exact:true}).click();
+  const dialog=page.getByRole("dialog", {name:/^Run /});
+  await dialog.getByRole("checkbox", {name:/db1/}).check();
+  await dialog.getByRole("button", {name:"Start run",exact:true}).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Stop run", exact: true })).toBeVisible();
   const request = await page.evaluate(() => (window as any).fixtureRunRequest);
-  expect(request.targets.map((target: any) => target.node_id)).toEqual(["edge1", "db1"]);
-  expect(request.targets.every((target: any) => target.connection.allow_unknown === true)).toBeTruthy();
-  expect(request.mode).toBe("check");
-  await page.getByRole("button", { name: "Stop run", exact: true }).click();
-  await expect(page.getByText("outcome unknown", { exact: true }).first()).toBeVisible();
-  await page.setViewportSize({ width: 460, height: 700 });
-  await page.getByText("1 task phase(s) · Results").click();
-  await expect(page.locator(".run-results pre")).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  expect(request.targets.map((target:any)=>target.node_id)).toEqual(["edge1","db1"]);
+  expect(request.mode).toBe("apply");
+  await page.getByRole("button", {name:"Stop run",exact:true}).click();
+  await expect(page.getByText("outcome unknown", {exact:true}).first()).toBeVisible();
 });
 
 test("RU physical shortcuts navigate, search, save and close; composition and terminal Ctrl are preserved", async ({ page }) => {
@@ -823,22 +858,18 @@ test("RU physical shortcuts navigate, search, save and close; composition and te
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("linked upstream playbook accepts controller and inputs; results export as JSON", async ({page}) => {
+test("legacy Ansible history remains exportable while Playbooks hides old formats", async ({page}) => {
   await fixture(page);
-  await page.evaluate(() => { (window as any).fixtureAutomations = [{id: "existing-project", kind: "ansible", source: "schema: 1"}]; });
-  await command(page, "run plan");
-  const dialog = page.getByRole("dialog", {name: /^Run /});
-  await dialog.getByLabel("Ansible controller · absolute Python path").fill("/tmp/controller/bin/python");
-  await dialog.getByLabel("Inputs · JSON object").fill('{"deployment":"preview"}');
-  await dialog.getByRole("button", {name: "Start check", exact: true}).click();
-  const request = await page.evaluate(() => (window as any).fixtureRunRequest);
-  expect(request.controller_python).toBe("/tmp/controller/bin/python");
-  expect(JSON.parse(request.input)).toEqual({deployment: "preview"});
-  await page.getByRole("button", {name: "Stop run", exact: true}).click();
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", {name: "Export results · JSON"}).click();
+  await page.evaluate(()=>{
+    (window as any).fixtureAutomations=[{id:"existing-project",kind:"ansible",source:"schema: 1"}];
+    (window as any).fixtureRuns=[{id:"run-fixture",job_id:"old",workspace_id:"fixture",revision:"r1",automation_id:"existing-project",kind:"ansible",mode:"check",targets:["edge1"],state:"succeeded",started_at:Date.now(),finished_at:Date.now(),results:[],message:"Check complete"}];
+  });
+  await page.getByRole("navigation").getByRole("button", {name:"Playbooks",exact:true}).click();
+  await expect(page.getByRole("button", {name:"Run existing-project",exact:true})).toHaveCount(0);
+  await page.getByRole("navigation").getByRole("button", {name:"Runs",exact:true}).click();
+  const download=page.waitForEvent("download");
+  await page.getByRole("button", {name:"Export results · JSON"}).click();
   expect((await download).suggestedFilename()).toContain("run-fixture");
-  await page.screenshot({path: "docs/evidence/ui-shell/32-ansible-results-fixture.png"});
 });
 
 test("ComfyUI recipe enforces pins and hashes then saves ordinary Ansible YAML without overflow", async ({page}) => {
@@ -869,7 +900,6 @@ test("ComfyUI recipe enforces pins and hashes then saves ordinary Ansible YAML w
   expect(source).toContain("ansible.builtin.get_url:"); expect(source).not.toContain("schema: 1");
   // Save the exact generated YAML for an independent upstream syntax check.
   await import("node:fs/promises").then(fs => fs.writeFile("/tmp/ghosh-comfy-generated.yml", source));
-  await editor.getByRole("button", {name: "Validate", exact: true}).click();
   await editor.getByRole("button", {name: "Save", exact: true}).click();
   await expect(page.getByRole("button", {name: "Run comfy-runpod", exact: true})).toBeVisible();
   await page.getByRole("button", {name: "Edit comfy-runpod", exact: true}).click();
@@ -879,11 +909,10 @@ test("ComfyUI recipe enforces pins and hashes then saves ordinary Ansible YAML w
 
 test("offline code editor highlights, completes, expands and saves with RU physical shortcut", async ({ page }) => {
   await fixture(page);
-  await command(page, "script new");
-  const dialog = page.getByRole("dialog", { name: "Create script" });
+  await command(page, "playbook new");
+  const dialog = page.getByRole("dialog", { name: "Create playbook" });
   await expect(dialog.locator(".monaco-editor")).toBeVisible();
   await expect(dialog.locator(".view-line span[class*=mtk]").first()).toBeVisible();
-  await dialog.getByRole("button", {name: "Maximize editor", exact: true}).click();
   await expect(dialog).toHaveClass(/editor-expanded/);
   const input = dialog.getByRole("textbox", { name: "Source code editor" });
   await input.focus(); await page.keyboard.press("Meta+a");
@@ -904,7 +933,7 @@ test("offline code editor highlights, completes, expands and saves with RU physi
   await page.screenshot({path: "docs/evidence/ui-shell/35-code-editor-fixture.png"});
   await input.dispatchEvent("keydown", {key:"ы",code:"KeyS",metaKey:true,bubbles:true});
   await expect(dialog).not.toBeVisible();
-  expect(await page.evaluate(() => (window as any).fixtureAutomations[0].source)).toBe(source);
+  expect(await page.evaluate(() => JSON.parse((window as any).fixtureAutomations[0].source).cells[0].code)).toBe(source);
 });
 
 test("live run progress and logs survive navigation and compact layout", async ({ page }) => {
@@ -912,19 +941,213 @@ test("live run progress and logs survive navigation and compact layout", async (
   await page.evaluate(() => {
     (window as any).fixtureRuns = [{id:"live-test",job_id:"job-live",workspace_id:"fixture",revision:"r1",automation_id:"multi-step-file",kind:"playbook",mode:"apply",targets:["edge1","db1"],state:"running",started_at:Date.now(),finished_at:null,results:[],message:"Targets execute sequentially.",progress:{total_steps:6,completed_steps:1,node_id:"edge1",step:"Write and verify file",phase:"apply",output:"Creating directory\nWriting file\n",truncated:false}}];
   });
-  await expect(page.getByRole("button", {name:"Running multi-step-file. Open live logs"})).toContainText("16%");
+  await expect(page.getByRole("button", {name:"Running multi-step-file. Open live logs"})).toContainText("Running step 2 of 6");
   await page.getByRole("button", {name:"Running multi-step-file. Open live logs"}).click();
-  await expect(page.getByLabel("Live command output")).toContainText("Writing file");
-  await expect(page.getByLabel("multi-step-file overall progress")).toHaveAttribute("value", "16");
+  await expect(page.getByLabel("Compact live output")).toContainText("Writing file");
+  await page.getByRole("button", {name:"Open full run",exact:true}).click();
+  await expect(page.getByLabel("multi-step-file overall progress")).not.toHaveAttribute("value");
   await page.getByRole("navigation").getByRole("button", {name:"Nodes",exact:true}).click();
   await page.evaluate(() => { const run = (window as any).fixtureRuns[0]; run.progress.completed_steps=4;run.progress.node_id="db1";run.progress.output="Second node still running\n"; });
-  await expect(page.getByRole("button", {name:"Running multi-step-file. Open live logs"})).toContainText("66%");
+  await expect(page.getByRole("button", {name:"Running multi-step-file. Open live logs"})).toContainText("Running step 5 of 6");
   await page.getByRole("button", {name:"Running multi-step-file. Open live logs"}).click();
-  await expect(page.getByLabel("Live command output")).toContainText("Second node still running");
+  await expect(page.getByLabel("Compact live output")).toContainText("Second node still running");
+  await page.getByRole("button", {name:"Open full run",exact:true}).click();
   await page.setViewportSize({width:460,height:760});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({path:"docs/evidence/ui-shell/36-live-run-fixture.png"});
   await page.evaluate(() => { const run = (window as any).fixtureRuns[0];run.state="succeeded";run.progress.completed_steps=6;run.progress.output=""; });
   await expect(page.getByLabel("multi-step-file overall progress")).toHaveAttribute("value","100");
-  await expect(page.getByRole("button", {name:"Running multi-step-file. Open live logs"})).not.toBeVisible();
+  await expect(page.getByRole("button", {name:"Finished multi-step-file. Open live logs"})).toContainText("Finished");
+});
+
+
+test("new file-identity nodes inherit global system keys and retain explicit agent choice", async ({ page }) => {
+  await fixture(page, true, false, false, 2);
+  await page.evaluate(() => {
+    (window as any).fixtureKeys = {revision:"keys-2",default_key:"system-key",keys:[{id:"system-key",label:"System key",path:"/fixture/.ssh/id_ed25519",storage:"reference",public:{algorithm:"ssh-ed25519",fingerprint:"SHA256:system-fixture"},encrypted:false,status:"available"}]};
+  });
+  await command(page, "node add");
+  const dialog = page.getByRole("dialog", {name:"Add node",exact:true});
+  await expect(dialog.getByLabel("Authentication", {exact:true})).toHaveText("System keys (default)");
+  await choose(dialog.getByLabel("Authentication", {exact:true}), "SSH agent");
+  await expect(dialog.getByLabel("SSH agent socket (optional)")).toBeVisible();
+  await expect(dialog.getByLabel("SSH identity", {exact:true})).toHaveCount(0);
+  await choose(dialog.getByLabel("Authentication", {exact:true}), "File key");
+  await expect(dialog.getByText("Global: SHA256:system-fixture · available", {exact:true})).toBeVisible();
+});
+
+test("Playbook authoring maximizes, drags stable steps and runs a saved cell with inline output", async ({page}) => {
+  await fixture(page);
+  await page.getByRole("navigation").getByRole("button", {name:"Playbooks",exact:true}).click();
+  await page.getByRole("button", {name:"New playbook",exact:true}).click();
+  const dialog=page.getByRole("dialog");
+  await expect(dialog.getByLabel("Playbook name", {exact:true})).toHaveValue("Multistep Playbook");
+  await dialog.getByRole("button", {name:"Add step",exact:true}).click();
+  const cells=dialog.getByRole("article");
+  await cells.nth(1).getByLabel("Step title", {exact:true}).fill("Inspect Python");
+  await choose(cells.nth(1).getByRole("combobox", {name:"Runtime",exact:true}), "Python");
+  await cells.nth(1).getByRole("button", {name:"Plain text",exact:true}).click();
+  await cells.nth(1).getByRole("textbox", {name:"Source",exact:true}).fill("import platform; print(platform.system())");
+  await expect(dialog).toHaveClass(/editor-expanded/);
+  await cells.nth(1).getByRole("button", {name:"Expand step",exact:true}).click();
+  await expect(cells.nth(1)).toHaveClass(/step-maximized/);
+  await cells.nth(1).getByRole("button", {name:"Restore step",exact:true}).click();
+  // Keep both handles visible so browser auto-scrolling does not move the source
+  // between Playwright's pointer positioning and the drag gesture.
+  await page.setViewportSize({width:1160,height:1800});
+  await cells.nth(1).getByRole("button", {name:/Drag step 2/}).dragTo(cells.nth(0).getByRole("button", {name:/Drag step 1/}));
+  await expect(cells.nth(0).getByLabel("Step title", {exact:true})).toHaveValue("Inspect Python");
+  await page.setViewportSize({width:1160,height:780});
+  await cells.nth(0).getByLabel("Timeout (seconds; 0 = none)").fill("0");
+  await cells.nth(1).getByRole("textbox", {name:"Source code editor"}).focus();
+  await page.keyboard.press("Meta+s");
+  await expect(dialog).not.toBeVisible();
+  await page.getByRole("button", {name:"Open Playbook multi-step",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Multistep Playbook",exact:true})).toBeVisible();
+  const saved=await page.evaluate(()=>JSON.parse((window as any).fixtureAutomations[0].source));
+  expect(saved.cells[0].timeout_s).toBe(0); expect(saved.cells[0].runtime).toBe("python"); expect(saved.cells[1].id).toBe("step-1");
+  await page.getByRole("button",{name:"Run step 2",exact:true}).click();
+  await expect(page.getByRole("dialog").getByRole("combobox", {name:"Steps to run",exact:true})).toHaveText("First step");
+  await page.getByRole("dialog").getByRole("checkbox",{name:/edge1/}).uncheck();
+  await page.getByRole("dialog").getByRole("checkbox",{name:/Local machine/}).check();
+  await page.getByRole("button",{name:"Start run",exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).fixtureRunRequest.cells)).toEqual(["step-1"]);
+  await page.evaluate(()=>{(window as any).fixtureRuns[0].results=[{node_id:"@local",name:"step-1 · First step",phase:"cell",state:"changed",output:"Hello from step 1",exit_code:0,truncated:false}];});
+  await page.getByRole("navigation").getByRole("button",{name:"Playbooks",exact:true}).click();
+  await expect(page.getByRole("article",{name:"Step 2: First step"}).getByText("Hello from step 1",{exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Minimize run monitor",exact:true}).click();
+  await page.screenshot({path:"docs/evidence/ui-shell/40-notebook-fixture.png"});
+  await command(page,"settings");
+  await choose(page.getByLabel("Interface zoom",{exact:true}), "200%");
+  await page.setViewportSize({width:460,height:760});
+  await page.getByRole("navigation").getByRole("button",{name:"Playbooks",exact:true}).click();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("Runs preserves legacy drift history and only offers execution history actions", async ({page}) => {
+  await fixture(page);
+  await page.evaluate(()=>{
+    (window as any).fixtureAutomations=[{id:"ms-script",kind:"playbook",source:"schema: 1"}];
+    (window as any).fixtureRuns=[{id:"finished",job_id:"old",workspace_id:"fixture",revision:"r1",automation_id:"ms-script",kind:"playbook",mode:"check",targets:["@local"],state:"succeeded",started_at:Date.now(),finished_at:Date.now(),results:[{node_id:"@local",name:"Create",phase:"check",state:"drift",output:"",exit_code:10,truncated:false}],message:"Check complete"}];
+  });
+  await page.getByRole("navigation").getByRole("button",{name:"Runs",exact:true}).click();
+  await expect(page.getByText("Check complete · changes needed",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Apply current saved playbook",exact:true})).toHaveCount(0);
+  await page.getByRole("button",{name:"Clear finished runs",exact:true}).click();
+  await expect(page.getByRole("dialog")).toContainText("including records beyond the latest 100");
+  await page.getByRole("button",{name:"Remove history",exact:true}).click();
+  await expect(page.getByText("No runs yet",{exact:true})).toBeVisible();
+});
+
+test("system authentication requires no separate setup wizard", async ({page}) => {
+  await fixture(page);
+  await page.getByRole("navigation").getByRole("button",{name:"SSH Keys",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Connect nodes with system keys…",exact:true})).toHaveCount(0);
+  await command(page,"node add");
+  await expect(page.getByLabel("Authentication",{exact:true})).toHaveText("System keys (default)");
+  expect(await page.evaluate(()=>(window as any).fixtureCalls.includes("keys_commit"))).toBe(false);
+});
+
+test("compact monitor leaves an independent SSH terminal usable during a run", async ({page}) => {
+  await fixture(page);
+  await page.evaluate(()=>{
+    (window as any).fixtureRuns=[{id:"active",job_id:"bg",workspace_id:"fixture",revision:"r1",automation_id:"notebook",kind:"notebook",mode:"apply",targets:["edge1"],state:"running",started_at:Date.now(),finished_at:null,results:[],message:"Running",progress:{total_steps:2,completed_steps:0,node_id:"edge1",step:"first · Inspect",phase:"cell",output:"streaming",truncated:false}}];
+    (window as any).fixtureOperations.jobs.jobs.push({id:"bg",kind:"automation_run",state:"running",cancellable:true,started_at:Date.now(),finished_at:null,error:null,stages:[]});
+  });
+  await expect(page.getByRole("complementary",{name:"Live run monitor"})).toBeVisible();
+  await command(page,"node terminal");
+  const dialog=page.getByRole("dialog");
+  await dialog.getByRole("button",{name:"Connect",exact:true}).click();
+  await expect(page.locator(".xterm-helper-textarea")).toBeFocused();
+  await page.keyboard.type("echo still-usable");
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixtureTerminalInput.length)).toBeGreaterThan(0);
+  await expect(page.getByLabel("Compact live output")).toContainText("streaming");
+  await expect(page.getByRole("complementary",{name:"Live run monitor"})).toContainText("Running step 1 of 2");
+  await expect(page.getByRole("complementary",{name:"Live run monitor"}).getByRole("progressbar")).not.toHaveAttribute("value");
+  await page.screenshot({path:"docs/evidence/ui-shell/41-background-monitor-fixture.png"});
+  await page.getByRole("button",{name:"Minimize run monitor",exact:true}).click();
+  await command(page,"settings");
+  await choose(page.getByLabel("Interface zoom",{exact:true}), "200%");
+  await page.setViewportSize({width:460,height:760});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button",{name:"Running notebook. Open live logs",exact:true}).click();
+  const bounds=await page.getByRole("complementary",{name:"Live run monitor"}).boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(461);
+  await page.getByRole("button",{name:"Minimize run monitor",exact:true}).click();
+  await expect(page.getByRole("complementary",{name:"Live run monitor"})).not.toBeVisible();
+});
+
+test("Playbook file drop is inert, saves exact source and exports all steps", async ({page}) => {
+  await fixture(page);
+  await page.getByRole("navigation").getByRole("button",{name:"Playbooks",exact:true}).click();
+  const source=JSON.stringify({schema:1,name:"Imported playbook",cells:[{id:"keep-id",title:"No timeout",runtime:"shell",code:"echo imported",timeout_s:-1,success_check:"true"}]},null,2);
+  const data=await page.evaluateHandle(source=>{ const transfer=new DataTransfer(); transfer.items.add(new File([source],"imported.steps.yml",{type:"text/yaml"})); return transfer; },source);
+  await page.getByRole("region",{name:"Import Playbook file"}).dispatchEvent("drop",{dataTransfer:data});
+  const dialog=page.getByRole("dialog",{name:"Create playbook"});
+  await expect(dialog.getByLabel("Playbook name",{exact:true})).toHaveValue("Imported playbook");
+  expect(await page.evaluate(()=>(window as any).fixtureAutomations.length)).toBe(0);
+  await dialog.getByRole("button",{name:"Save",exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await page.getByRole("button",{name:"Export imported",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixtureExport?.source)).toBe(source);
+  expect(await page.evaluate(()=>(window as any).fixtureCalls.includes("run_start"))).toBe(false);
+  await page.evaluate(source=>{(window as any).fixtureImport={id:"picked",kind:"notebook",source};},source);
+  await page.getByRole("button",{name:"Import Playbook",exact:true}).click();
+  await expect(dialog.getByLabel("ID",{exact:true})).toHaveValue("picked");
+});
+
+
+test("Monitor explicitly connects, streams bounded output and pauses hidden resource probes", async ({page})=>{
+  await fixture(page);
+  await page.getByRole("navigation").getByRole("button",{name:"Monitor",exact:true}).click();
+  await expect(page.getByRole("navigation").getByRole("button",{name:"Scripts",exact:true})).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as any).fixtureCalls.includes("monitor_open"))).toBe(false);
+  await page.getByRole("button",{name:"Connect Monitor",exact:true}).click();
+  await expect(page.getByLabel("Node resource consumption")).toContainText("12.5%");
+  expect(await page.evaluate(()=>(window as any).fixtureCalls.includes("monitor_start"))).toBe(false);
+  await page.getByLabel("Log command",{exact:true}).fill("journalctl -f --no-pager");
+  await page.getByRole("button",{name:"Run log command",exact:true}).click();
+  await expect(page.getByLabel("Monitor output")).toContainText("monitor live fixture");
+  await page.getByRole("navigation").getByRole("button",{name:"Nodes",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixtureMonitorVisible)).toBe(false);
+  await page.getByRole("navigation").getByRole("button",{name:"Monitor",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixtureMonitorVisible)).toBe(true);
+  await page.getByRole("button",{name:"Stop",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Connect Monitor",exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).fixtureCalls.includes("run_start"))).toBe(false);
+});
+
+test("restoring example Playbooks preserves every existing ID",async({page})=>{
+  await fixture(page);
+  await page.evaluate(()=>{(window as any).fixtureAutomations=[{id:"steps-success",kind:"notebook",source:JSON.stringify({schema:1,name:"My edited example",cells:[{id:"first",title:"Mine",runtime:"shell",code:"echo mine",timeout_s:0,success_check:null}]})}];});
+  await page.getByRole("navigation").getByRole("button",{name:"Playbooks",exact:true}).click();
+  await page.getByRole("button",{name:"Restore example Playbooks",exact:true}).click();
+  await expect(page.getByRole("status").filter({hasText:"Restored: steps-failure, steps-timeout"})).toBeVisible();
+  const read=()=>page.evaluate(()=>(window as any).fixtureAutomations);
+  const before=await read();expect(before).toHaveLength(3);expect(JSON.parse(before[0].source).name).toBe("My edited example");
+  await page.getByRole("button",{name:"Restore example Playbooks",exact:true}).click();
+  await expect(page.getByRole("status").filter({hasText:"Restored: none"})).toBeVisible();
+  expect(await read()).toEqual(before);
+});
+
+test("shortcut overlay releases and terminal session navigation wraps with guarded close",async({page})=>{
+  await fixture(page);
+  await page.keyboard.down("Meta"); await page.keyboard.down("Alt");
+  await expect(page.getByRole("region",{name:"Keyboard shortcut overlay"})).toBeVisible();
+  await page.keyboard.up("Alt");await page.keyboard.up("Meta");
+  await expect(page.getByRole("region",{name:"Keyboard shortcut overlay"})).not.toBeVisible();
+  for(let i=0;i<2;i++){await command(page,"terminal open");await page.getByRole("button",{name:"Open shell",exact:true}).click();}
+  const tabs=page.getByRole("group",{name:"Terminal sessions"});
+  await page.keyboard.press("Meta+Shift+[");
+  await expect(tabs.getByRole("button",{name:"Local 1",exact:true})).toHaveAttribute("aria-pressed","true");
+  await page.keyboard.press("Meta+Shift+[");
+  await expect(tabs.getByRole("button",{name:"Local 2",exact:true})).toHaveAttribute("aria-pressed","true");
+  await page.keyboard.press("Meta+w");
+  await expect(page.getByRole("alertdialog")).toContainText("Terminate terminal session?");
+  await page.getByRole("button",{name:"Terminate session",exact:true}).click();
+  await expect(tabs.getByRole("button",{name:"Close terminal Local machine",exact:true})).toHaveCount(1);
+  await tabs.getByRole("button",{name:"Close terminal Local machine",exact:true}).click();
+  await page.getByRole("button",{name:"Terminate session",exact:true}).click();
+  await expect(page.getByRole("tab",{name:"Terminal",exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Open local terminal",exact:true})).toBeVisible();
 });

@@ -271,6 +271,20 @@ fn encrypted(bytes: &[u8]) -> Result<bool> {
     Err(unavailable())
 }
 impl FileKeyRegistry {
+    /// Resolve one reviewed system file without importing it into the registry.
+    pub fn resolve_preview(
+        &self,
+        access: &crate::policy::SecretAccess,
+        preview: &KeyImportPreview,
+        inspector: &dyn KeyInspector,
+    ) -> Result<Zeroizing<Vec<u8>>> {
+        let _ = access.workspace_id();
+        let (current, bytes, _) = self.inspect(&preview.request, inspector)?;
+        if current.digest != preview.digest {
+            return Err(unavailable());
+        }
+        Ok(bytes)
+    }
     /// Native-only resolution after an explicit trusted operation. The caller
     /// must bind this registry revision and identity to the reviewed operation.
     pub fn resolve(

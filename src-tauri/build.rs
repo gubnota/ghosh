@@ -1,7 +1,16 @@
 fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "monitor_open",
+            "monitor_poll",
+            "monitor_start",
+            "monitor_close",
             "run_start",
+            "playbook_import",
+            "playbook_export",
+            "notebook_parse",
+            "runs_cleanup",
+            "system_key_candidates",
             "runs_list",
             "run_stop",
             "automations_list",

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "name": "Timeout Multistep Playbook",
+  "cells": [
+    {
+      "id": "timeout",
+      "title": "Exceed a one-second limit",
+      "runtime": "shell",
+      "code": "printf 'Waiting five seconds with a one-second limit\\n'; sleep 5",
+      "timeout_s": 1,
+      "success_check": null
+    },
+    {
+      "id": "unlimited",
+      "title": "The same wait without a timeout",
+      "runtime": "shell",
+      "code": "sleep 5; printf 'Finished without a timeout\\n'",
+      "timeout_s": 0,
+      "success_check": "true"
+    }
+  ]
+}

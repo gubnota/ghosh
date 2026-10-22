@@ -15,9 +15,10 @@ use std::{
 };
 use tauri::{AppHandle, Emitter};
 mod ansible;
-mod automation;
+pub(crate) mod automation;
 mod history;
 mod local_exec;
+mod monitor;
 mod source_lint;
 pub(crate) use source_lint::lint_source;
 mod runs;
@@ -56,6 +57,7 @@ impl DocumentOpenQueue {
 pub struct Services {
     ssh_reviews: Mutex<Vec<ssh::Review>>,
     runs: Mutex<runs::RunRegistry>,
+    monitor: Mutex<Option<monitor::Monitor>>,
     pub terminals: ghosh_term::Terminals,
     pub jobs: Jobs,
     approvals: Mutex<Approvals>,
@@ -83,6 +85,7 @@ impl Services {
         Ok(Self {
             ssh_reviews: Mutex::new(Vec::new()),
             runs: Mutex::new(runs::RunRegistry::default()),
+            monitor: Mutex::new(None),
             terminals: ghosh_term::Terminals::default(),
             jobs: Jobs::default(),
             approvals: Mutex::new(Approvals::default()),
@@ -105,6 +108,7 @@ impl Services {
         }
         self.approvals.lock().map_err(poisoned)?.synchronize(None);
         self.ssh_reviews.lock().map_err(poisoned)?.clear();
+        *self.monitor.lock().map_err(poisoned)? = None;
         Ok(())
     }
     pub fn workspace_key(&self, request: RevisionRequest) -> Result<Option<String>> {
@@ -158,11 +162,20 @@ impl Services {
             .ok_or_else(|| AppError::new(ErrorCode::Denied))?
             .workspace
             .workspace_key(Principal::LocalUi, &request.context)?;
-        Ok(select_identity(
-            &request.node,
-            default.as_deref(),
-            &self.keys()?,
-        ))
+        let mut identity = select_identity(&request.node, default.as_deref(), &self.keys()?);
+        if matches!(
+            request.node.effective_auth_method(),
+            ghosh_core::workspace::model::AuthMethod::System
+        ) {
+            match self.system_identity(&request.node) {
+                Ok(key) => {
+                    identity.public = Some(key.public);
+                    identity.status = Some(KeyStatus::Available);
+                }
+                Err(_) => identity.status = Some(KeyStatus::Missing),
+            }
+        }
+        Ok(identity)
     }
     pub fn generate_key(&self, request: KeyGenerateRequest) -> Result<KeysSnapshot> {
         self.with_keys(|keys| {
@@ -182,6 +195,28 @@ impl Services {
                 &crate::platform::ssh_keys::OpenSshInspector,
             )
         })
+    }
+    /// Inspect only fixed conventional candidates after an explicit local UI request.
+    pub fn system_key_candidates(&self) -> Result<Vec<KeyImportPreview>> {
+        let home =
+            std::env::var_os("HOME").ok_or_else(|| AppError::new(ErrorCode::KeyUnavailable))?;
+        let home = PathBuf::from(home);
+        let mut candidates = vec![];
+        for (relative, label) in [
+            (".ssh/id_ed25519", "System Ed25519"),
+            (".ssh/id_rsa", "System RSA"),
+            (".orbstack/ssh/id_ed25519", "OrbStack Linux"),
+        ] {
+            let request = KeyImportRequest {
+                label: label.into(),
+                path: home.join(relative).to_string_lossy().into_owned(),
+                storage: KeyStorage::Reference,
+            };
+            if let Ok(preview) = self.preview_key(request) {
+                candidates.push(preview);
+            }
+        }
+        Ok(candidates)
     }
     pub fn keys(&self) -> Result<KeysSnapshot> {
         self.with_keys(|keys| keys.snapshot(Principal::LocalUi))
@@ -256,6 +291,7 @@ impl Services {
         }
         self.edit_history(|history| history.last = None)?;
         self.invalidate_reviews(&mut active)?;
+        *self.monitor.lock().map_err(poisoned)? = None;
         self.terminals.close_all();
         *active = None;
         Ok(())
@@ -298,6 +334,7 @@ impl Services {
                 "Recent workspace history could not be saved. The workspace is still open.".into(),
             );
         }
+        *self.monitor.lock().map_err(poisoned)? = None;
         self.terminals.close_all();
         *active = Some(Active {
             context: ApprovalContext::new(snapshot.id.clone(), snapshot.revision.clone()),

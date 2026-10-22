@@ -101,6 +101,10 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Command popup routes typed app actions without evaluating arbitrary shell input.
 
 ## File keys, nodes and migration (implemented)
+- New node drafts use `auth.method = system` and the current user's system file keys.
+  Legacy schema-1 Agent/no-socket nodes resolve to System; explicit schema-2 Agent
+  and custom sockets retain agent authentication. Explicit `key` nodes with no
+  `key_id` inherit workspace/global registered file keys.
 - SSH file keys supersede Keychain-based SSH examples; SecretRef stays separate.
 - `keys_list`, `keys_preview`, `keys_commit`, `keys_default`, `keys_forget`,
   `keys_pick`, `keys_generate`, `keys_relink` manage only explicit selected files.
@@ -113,6 +117,10 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
   `key_id` (omitted means inherit). Schema-1 key_ref remains legacy/inert for transport.
 - `nodes_list`, `nodes_preview`, `nodes_commit` perform revisioned CRUD/import;
   opening/listing/saving nodes never connects. See [SSH_KEY_STORAGE.md](SSH_KEY_STORAGE.md).
+- Node IDs/filename stems accept `[A-Za-z0-9][A-Za-z0-9_-]{0,63}` in schemas 1/2;
+  preserve case and resolve jump references exactly. Reject case-only duplicates
+  on load and CRUD/import with a static `conflict` message. Malformed IDs return
+  a static node-specific `invalid_document` message; other entity rules stay lowercase.
 - Local registry IDs/public metadata only cross IPC; node > workspace > global
   defaults. No persisted SSH passphrases, no implicit key fallback or export.
 - Command popup is an app action router; it cannot evaluate arbitrary shell text
@@ -220,7 +228,7 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 
 
 ## Manual local-UI automation runs
-- run_start({automation:{context,id,kind},mode:check|apply,targets:[{node_id,connection}],input:JSON-object-string,controller_python?:absolute-path|null}) -> RunReport.
+- run_start({automation:{context,id,kind},mode:check|apply,targets:[{node_id,connection}],input:JSON-object-string,controller_python?:absolute-path|null,cells?:string[]}) -> RunReport.
 - Targets: 1–8 distinct IDs; @local has null connection, nodes use single-use NodeConnectionCommit tickets.
 - Requires current approved/editable source and revision, no conflicting job; all target tickets authenticate before task execution.
 - Scripts only Apply. Simple YAML targets restrict requested node IDs. Standard Ansible supports Check/Apply.
@@ -241,7 +249,7 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Retries are explicit/bounded/fresh-check; no retry on interruption. Handlers run once per successfully changed node.
 - runs_list(RevisionRequest) -> latest 100 RunReport for workspace ID; listing remains inert after external changes.
 - run_stop(id) -> cancellation request; completed changes persist. Local group stopped/reaped; remote interruption is outcome_unknown.
-- States: running/succeeded/failed/stopped/outcome_unknown. Task phases include check/apply/verify/script/connect.
+- States: running/succeeded/failed/stopped/outcome_unknown. Task phases include check/apply/verify/script/cell/connect.
 - Running snapshot without a live worker becomes unknown on read after crash; never replay.
 - Reports: app-local runs/<uuid>.json atomic snapshot and metadata-only .jsonl events; 0700/0600.
 - Output: 32 KiB/phase, 256 KiB/run, max 2,048 results; both streams drain beyond cap.
@@ -251,4 +259,50 @@ Remove/clear clears matching last; persistence failures preserve the in-memory h
 - Ansible total_steps=null; filtered task starts/results update active task and completed count.
 - Live registry merges into running snapshots; both local/SSH streams publish masked bounded previews before exit. Prefix withholding prevents split literal-input leaks.
 - UI polls at 600 ms and navigation does not cancel workers. Completed phases/final reports persist; live-only chunks are not a crash journal. App exit is not supported continuation.
-- Export JSON downloads the current bounded snapshot. No retention cleanup yet.
+- Export JSON downloads the current bounded snapshot. Finished history can be removed explicitly; no automatic retention policy.
+
+## Multistep Playbooks, system identities and cleanup
+- AutomationKind notebook uses playbooks/<id>.steps.yml; legacy scripts/*.steps.yml stays in place. JSON is valid YAML; cell editor
+  serializes JSON. notebook_parse(source) -> Notebook; no execution during parsing.
+- Schema 1: name, cells[1..256] with unique entity IDs, title, runtime shell|python|deno,
+  code, timeout_s 0 (unlimited), legacy -1 alias, or 1..3600 (default 30), optional success_check Shell command.
+  Both code and check use this limit; internal Executor 0 means unlimited, with cancellation.
+- Source max 256 KiB; commands max 64 KiB; NUL/empty code and unknown fields rejected.
+- RunRequest.cells defaults []; all saved cells, or unique known IDs in document order.
+  Non-notebook kinds reject nonempty selection. Runs execute saved revision-bound code.
+- Cells start fresh interpreter processes. Files persist; variables/cwd do not carry.
+  Code must exit 0; optional success_check must exit 0. Failure stops that target.
+- Cell names/progress step encode stable ID as "<id> · <title>"; phases cell/verify.
+  Progress counts successful cells once × targets. Existing report schema stays readable.
+- Check success with drift is presented as changes needed, never as an applied write.
+  Apply from history opens current saved source with fresh target/credential review.
+- System auth resolves fixed current-user paths without registry imports: OrbStack
+  key for *.orb.local; otherwise Ed25519, then RSA only if Ed25519 is absent.
+  Schema-1 Agent with no socket has effective System auth; explicit schema-2 Agent,
+  custom socket, file key and password choices retain precedence. Safe-file checks and
+  digest/fingerprint pinning apply to PTY, native runs and Runner alike.
+- playbook_import(path:null|string) -> AutomationDocument|null: native file picker or
+  dropped path; bounded regular non-symlink source, validated schema, sanitized ID.
+  No workspace writes/execution; normal preview/commit handles duplicate IDs and save.
+- playbook_export(document) -> bool: validate notebook source, native save picker,
+  write exact source; false means cancelled. No identity/credential data is added.
+- runs_cleanup({context,id:null|string}) -> removed count. Native validates current
+  editable revision, UUID and workspace ownership; active workers cannot be deleted.
+  Null clears finished reports (also beyond list limit), retaining active/foreign files.
+  JSONL is removed before JSON; directory is synced. Orphan running files become unknown.
+- Modeless monitor follows bounded output without trapping keyboard focus. Independent
+  SSH tests/PTY opens are allowed during automation; workspace edits/replacement remain
+  guarded, only one automation runs, and app exit does not continue execution.
+
+## Ephemeral Monitor
+- monitor_open(MonitorOpen {context, connection?}) → {id,target}; revision-bound,
+  trusted writable workspace, optional consumed SSH ticket; one session per app.
+- monitor_start(id,command): explicit command, nonempty, no NUL, ≤16 KiB; one log job.
+- monitor_poll(id,visible) → {output,truncated,running,exit_code,metrics}; output
+  latest 64 KiB; metrics nullable finite 0..100 percentages for CPU/memory/root disk.
+- Two serialized channels isolate logs and probes. Probe every 5s only visible,
+  4s deadline, ≤16 KiB capture. Local groups killed/reaped; SSH channel closed on Stop.
+- monitor_close(id) idempotently drops matching session. Workspace invalidation,
+  switch/close and app exit dispose transport. No durable history or automatic replay.
+- Playbook Save always previews/commits atomically; syntax lint is advisory. Structural
+  validation reports the step/field without embedding source or credential contents.

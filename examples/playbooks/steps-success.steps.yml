@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "Successful Multistep Playbook",
+  "cells": [
+    {
+      "id": "prepare",
+      "title": "Create example directory",
+      "runtime": "shell",
+      "code": "mkdir -p /tmp/ghosh-playbook-example; printf 'Directory ready\\n'",
+      "timeout_s": 10,
+      "success_check": "test -d /tmp/ghosh-playbook-example"
+    },
+    {
+      "id": "write",
+      "title": "Write and verify a file",
+      "runtime": "shell",
+      "code": "printf 'Hello from Ghosh\\n' > /tmp/ghosh-playbook-example/output.txt; sleep 1; printf 'File written\\n'",
+      "timeout_s": 10,
+      "success_check": "grep -qx 'Hello from Ghosh' /tmp/ghosh-playbook-example/output.txt"
+    },
+    {
+      "id": "read",
+      "title": "Read the saved file without a timeout",
+      "runtime": "shell",
+      "code": "cat /tmp/ghosh-playbook-example/output.txt",
+      "timeout_s": 0,
+      "success_check": null
+    }
+  ]
+}

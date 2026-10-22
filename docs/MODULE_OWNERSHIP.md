@@ -32,6 +32,8 @@ Future services remain explicitly listed below.
 - Terminal UI necessarily carries user-entered PTY bytes; it never receives private key files.
 - ghosh-term owns shell/process lifecycle; React owns emulator parsing and acknowledgement.
 - Rust rechecks caller identity, workspace ID, revision and filesystem state for edits.
+- Core workspace owns case-preserving node IDs and case-insensitive uniqueness;
+  React mirrors the ID format for immediate form feedback. Jump lookup stays exact.
 - No filesystem work on the UI thread; commands offload it to blocking workers.
 - Services serialize active-workspace mutations; watcher callbacks emit safe invalidation hints.
 - Document-open events queue before initialization; they do not load/execute packages directly.
@@ -91,3 +93,23 @@ Future services remain explicitly listed below.
 - Controller integration tests own real module/idempotence/no_log/include/role/inventory/handler/cancel acceptance.
 - GPU/template compatibility and live agent/password Runner acceptance remain separate gates.
 - SSH UI auto-consumes native tickets without human confirmation; transport owns key pinning and changed-host rejection.
+
+## Multistep Playbook and run lifecycle boundaries
+- Core owns notebook schema, saved-cell selection/order and cell/verify execution through
+  the existing Executor port. No Jupyter kernel or second execution engine.
+- Native run services own worker serialization, report ownership and cleanup races.
+- React owns cell drafts, per-cell presentation and modeless monitor focus. It requests
+  saved revision-bound runs and cannot execute unsaved editor content.
+- Native SSH services resolve and pin System files; the registry inspector owns file safety.
+  Core owns legacy effective-auth policy; React defaults new nodes to System.
+- Native transfer commands own file pickers and bounded import/export; React owns inert
+  imported drafts. Workspace preview/commit still owns validation and publication.
+- Independent SSH PTYs remain terminal-owned while automation runs; workspace lifecycle
+  stays guarded and the automation worker remains singular.
+
+- Monitor is separate from run reports and terminal PTYs. Core owns DTOs; native
+  services own bounded buffers, subprocess cleanup and workspace revision checks.
+  SSH owns authenticated non-PTY transport; React owns visibility and explicit actions.
+- Workspace invalidation and application exit dispose Monitor. Probes never install
+  tools, persist logs or request sudo. Remote cancellation remains server-dependent.
+- Shared shortcut definitions drive the held overlay, persistent help and Settings.

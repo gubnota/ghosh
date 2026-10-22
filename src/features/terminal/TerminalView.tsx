@@ -136,14 +136,27 @@ export function TerminalView({ workspace, incoming, incomingHandled, active, req
   };
   const close = async (id: string) => {
     if (busy) return; setBusy(true);
-    try { await api.terminalClose(id); setSessions(previous => previous.filter(session => session.id !== id)); setSelected(sessions.find(session => session.id !== id)?.id || ""); setClosing(null); }
+    try { await api.terminalClose(id); setSessions(previous => previous.filter(session => session.id !== id)); const next = selected === id ? sessions.find(session => session.id !== id)?.id || "" : selected; setSelected(next); setClosing(null); if (next) focus(next); }
     catch (error) { setError(errorMessage(error)); } finally { setBusy(false); }
   };
+  useEffect(() => {
+    const shortcut = (event: Event) => {
+      if (!active || opening || remoteOpening || closing || paste) return;
+      const action = (event as CustomEvent<string>).detail;
+      if (action === "close") { if (selected) setClosing(selected); return; }
+      if (!sessions.length) return;
+      const index = sessions.findIndex(session => session.id === selected);
+      const next = sessions[(index + (action === "previous" ? -1 : 1) + sessions.length) % sessions.length];
+      setSelected(next.id); focus(next.id);
+    };
+    window.addEventListener("terminal-shortcut", shortcut);
+    return () => window.removeEventListener("terminal-shortcut", shortcut);
+  }, [active, selected, sessions, opening, remoteOpening, closing, paste]);
   const secondary = sessions.find(session => session.id !== selected)?.id;
   return <div className="terminal-surface"><div className="page-heading"><div><p className="eyebrow">REAL PTY</p><h1>Terminal</h1><p>Local & SSH shells · Cmd+K commands · Cmd+Shift+E leaves terminal focus</p></div><div className="inline-actions"><button onClick={() => setRemoteOpening(true)} disabled={sessions.length >= 8 || !workspace?.trusted || !workspace.nodes.length || workspace.read_only || workspace.external_changed}><Icon name="Terminal" />Node terminal</button><button onClick={() => setOpening(true)} disabled={sessions.length >= 8}><Icon name="Plus" />New local terminal</button></div></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="terminal-toolbar"><label htmlFor="terminal-search" className="sr-only">Search terminal output</label><input id="terminal-search" data-surface-search placeholder="Search output…" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); handles.current.get(selected)?.find(query, event.shiftKey); } }} /><button onClick={() => handles.current.get(selected)?.find(query)}><Icon name="Search" />Find next</button><button disabled={sessions.length < 2} aria-pressed={split} onClick={() => setSplit(value => !value)}>Split view</button><button disabled={!selected} onClick={() => focus(selected)}>Focus terminal</button><button disabled={!selected} onClick={() => setClosing(selected)}><Icon name="X" />Close session</button></div>
-    <div className="terminal-sessions" role="group" aria-label="Terminal sessions">{sessions.map((session, index) => <button key={session.id} aria-pressed={selected === session.id} onClick={() => { setSelected(session.id); focus(session.id); }} title={session.target}>{session.target === "Local machine" ? `Local ${index + 1}` : session.target.split(" · ")[0]}</button>)}</div>
+    <div className="terminal-sessions" role="group" aria-label="Terminal sessions">{sessions.map((session, index) => <span className="terminal-session-tab" key={session.id}><button aria-pressed={selected === session.id} onClick={() => { setSelected(session.id); focus(session.id); }} title={session.target}>{session.target === "Local machine" ? `Local ${index + 1}` : session.target.split(" · ")[0]}</button><button className="quiet" aria-label={`Close terminal ${session.target}`} title="Close session · Cmd+W" onClick={() => setClosing(session.id)}><Icon name="X" /></button></span>)}</div>
     {!sessions.length && <div className="empty-state"><h2>No terminal sessions</h2><p>Open a real local shell or connect to a configured SSH node.</p><button onClick={() => setOpening(true)}><Icon name="Terminal" />Open local terminal</button></div>}
     <div className={`terminal-panes ${split ? "split" : ""}`}>{sessions.map(session => <TerminalPane key={session.id} session={session} visible={active && (selected === session.id || (split && secondary === session.id))} fontSize={fontSize} register={(id, handle) => { if (handle) handles.current.set(id, handle); else handles.current.delete(id); }} reviewPaste={(id, text) => setPaste({ id, text })} report={setError} />)}</div>
     {remoteOpening && workspace && <ConnectionTest workspace={workspace} mode="terminal" onTerminal={adopt} dismiss={() => setRemoteOpening(false)} busyChanged={setBusy} />}

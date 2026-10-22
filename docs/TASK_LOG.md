@@ -464,3 +464,151 @@
   README/controller requirements; archive SHA-256 and embedded README verification
   passed. Main/tag publication is authorized; CI status is tracked separately.
   Linux CI remains commented out; only version tags trigger the macOS workflow.
+# 2026-10-19 — Default new nodes to inherited file keys
+
+- Fixed schema-2 Add node drafts incorrectly starting with SSH agent authentication.
+  Drafts now use file authentication with no node key override, inheriting the
+  configured workspace/global system or custom file key through the shared resolver.
+- Existing/imported agent nodes remain explicit; schema-1 drafts retain agent mode
+  until reviewed file-identity migration. Existing node `1` must be changed to File key
+  to inherit a configured default; no user workspace was edited automatically.
+- Verified strict frontend production build, all 33 sequential browser journeys
+  and three native identity tests (precedence, missing/changed keys and migration).
+  Browser coverage checks default inheritance, saved schema/auth/key binding and
+  explicit agent switching. No live remote SSH retest or desktop bundle rebuild.
+
+## 2026-10-19 — Notebook scripts, reviewed system identities and usable background runs
+
+- Approved plan: IMPLEMENTATION_PLAN_NOTEBOOK_RUNS.md. Check reports explicitly say
+  whether changes are needed; history offers Apply against current saved source.
+  Temporary-file native acceptance proves Check leaves the file absent and Apply
+  writes/verifies it. The user's ms-script previously ran Check, explaining no file.
+- Added saved .steps.yml notebooks: stable ordered cells, Shell/Python/Deno, Run cell
+  or all, timeouts, optional Shell success checks and inline bounded results. Each
+  cell starts a new process; files persist, kernel state does not. Keyboard save
+  uses the same validated revision-bound commit as other script editors.
+- Added explicit reviewed file-key setup for existing agent nodes, separate OrbStack
+  and system-key bindings, schema migration/backup and no silent agent fallback.
+  Existing user workspace, key registry and global default were not changed.
+- Added workspace-scoped Remove/Clear finished history, including JSONL; malformed,
+  foreign and active IDs are protected, including worker finalization races.
+- Added modeless output/Stop/minimize/full-run monitor. Automation no longer blocks
+  independent SSH shells; one automation and workspace mutation guards remain.
+- Full checks passed: 91 Rust tests, three opt-ins skipped, 37 sequential browser
+  journeys, formatting, warning-denied Clippy, contract freshness and production build.
+- Genuine native read-only SSH/PTY/exec/scenario and saved Shell/Python notebook
+  with success-check/concurrent-shell acceptance passed separately on OrbStack
+  (11.81 s) and node3 (28.37 s), with existing per-node file keys and host trust.
+  No remote software installation or persistent test files.
+- Browser captures 40–41 are fixture evidence; remote tests above use real native
+  transport. Native release rebuild and rebuilt-app acceptance recorded below.
+- Rebuilt v0.1.5 macOS arm64 app: genuine desktop notebook completed two saved
+  Shell/Python cells plus success-check, created/read the temporary expected file,
+  and showed live progress/output while an independent local PTY returned its
+  sentinel. Native evidence 42–43; original 1.ghosh restored and test shell closed.
+- Corrected completed monitor accessibility label after native inspection; two
+  focused progress/monitor browser journeys passed again. Release includes this fix.
+- Release archive: artifacts/v0.1.5-macos-arm64/ghosh-v0.1.5-macos-arm64.tar.gz.
+  Final native build succeeded; SHA256SUMS verified. Final app relaunched into 1.ghosh.
+  User workspace/key registry/global defaults unchanged; existing agent nodes need
+  reviewed per-node system-key setup. Keep the app open for background execution.
+- Graphify source-upload step was rejected by automatic approval review; analysis
+  continued locally. No complete graph generation or external upload is claimed.
+
+## 2026-10-19 — Multistep Playbook defaults and transfer
+
+- Approved plan: IMPLEMENTATION_PLAN_PLAYBOOK_DEFAULTS.md and user follow-ups.
+  New Playbooks default to ordered Shell/Python/Deno steps; the full editor and
+  each complete step can occupy the window. Drag reorder preserves saved step IDs;
+  Move up/down provide a keyboard alternative. Offline completion includes keywords
+  and function/control-flow constructions alongside syntax diagnostics.
+- New documents save in playbooks/<id>.steps.yml. Legacy scripts/<id>.steps.yml
+  remain readable/editable in place; duplicate IDs across those folders are rejected.
+- System authentication uses the current user's existing SSH file, with OrbStack's
+  host-specific key for *.orb.local. Legacy schema-1 Agent/no-socket nodes use this
+  policy without registry import, migration or a setup button. Explicit agents,
+  custom sockets, registered keys and passwords remain explicit. File identity is
+  pinned at review and rechecked at authentication; unsafe/changed keys fail.
+- Step 1 displays running activity before any step finishes. Modeless bounded output
+  and independent terminals remain usable; finished Runs can be removed/cleared.
+- Import and drag/drop open inert drafts; export preserves all saved source. Native
+  import bounds file size and rejects directories/symlinks; normal revision-bound
+  validation/save handles duplicates. Added successful, failing and timeout examples
+  in examples/playbooks, offered directly in the Playbooks catalog.
+- User-defined timeout -1 means unlimited for both step code and success check.
+  Finite timeouts remain 1..3600; 0 and other negative values are invalid documents.
+  Stop still cancels unlimited execution. Timeout/interruption retains Outcome unknown
+  because remote/local changes may already have occurred.
+- 96 Rust tests pass (three opt-in tests skipped in the ordinary suite). Genuine local
+  examples create/verify the expected file, fail with exit 7, time out at one second,
+  finish a five-second unlimited step, and cancel a longer unlimited step.
+- Agent-disabled native system-key acceptance passed both authorized hosts (27.09 s),
+  including OrbStack's saved Shell/Python Playbook and independent PTY. A separate
+  node3 run proves its saved Playbook, unlimited Shell step/check and independent
+  SSH PTY (31.67 s). No remote installation or persistent remote test files.
+- Browser drag initially tested endpoints that scrolled out of view before pointer
+  press. Keeping both handles visible verifies a real drag; the complete authoring
+  journey now passes, including stable order, -1 persistence and per-step execution.
+- Final formatting, Clippy with warnings denied, 96 Rust tests, generated-contract
+  freshness and production frontend build pass. All 38 browser workflows pass after
+  replacing stale percentage assertions with active-step and indeterminate-progress checks.
+- The running desktop app contains an open Playbook draft. Preserve that session;
+  rebuilt-app GUI acceptance is pending saving the draft and reopening the new app.
+- macOS arm64 v0.1.5 release rebuilt successfully; packaged Ghosh.app is 14.93 MiB.
+  Release archive SHA256SUMS verification passes. Current app was not restarted.
+
+## 2026-10-20 — Playbooks, Monitor and keyboard workflows
+
+- Approved plan: IMPLEMENTATION_PLAN_MONITOR_PLAYBOOKS.md and user follow-ups.
+  Playbooks exposes only multistep documents; Scripts navigation becomes Monitor.
+  Legacy files/reports remain intact. Runs contains executions/history, output,
+  Stop, export and cleanup; starting Playbooks stays in Playbooks.
+- Fixed the reported Save error: timeout 0 now means unlimited for code and success
+  checks; legacy -1 remains accepted. Other negative values receive a safe, specific
+  structural error. Syntax diagnostics are advisory. Save/Cmd+S performs atomic,
+  revision-bound persistence directly without a separate Validate action or execution.
+  Runtime and Timeout controls align; examples use 0.
+- Restore example Playbooks creates only missing stable IDs; existing edits and
+  collisions remain untouched. Examples remain ordinary editable documents.
+- Monitor owns an independent local/SSH connection, bounded log output and actual
+  CPU/RAM/disk measurements. Journal, file-tail and macOS log presets remain editable;
+  commands require explicit Run. Probes pause while hidden. Stop/disconnect cleans
+  up local processes/channels; remote termination remains server-dependent.
+- Terminal sessions have X buttons, guarded Cmd+W close, and Cmd+Shift+[ / ] cycling
+  with focus restoration. Closing the last session keeps Terminal ready for another.
+  Hold Cmd+Option for shortcut help; release, Escape or blur dismisses it. Persistent
+  searchable help shares its shortcut definitions.
+- Formatting, warnings-denied Clippy, all 99 Rust tests (3 opt-in tests skipped),
+  generated contract freshness, production frontend build and all 41 browser
+  workflows pass. Native atomic-save coverage proves syntax errors and timeout 0
+  persist without executing source. Local Monitor metrics/cancellation pass.
+- Agent-disabled system-key authentication and independent Monitor log/CPU/RAM/disk
+  acceptance pass on both authorized OrbStack Debian and node3 targets (31.90 s). No key registry
+  or user workspace changes; no remote installation.
+- Preserve the running desktop app and its open Playbook draft; rebuilt-app GUI
+  acceptance requires saving the draft and reopening the updated application.
+- macOS arm64 v0.1.5 release rebuilt successfully (Ghosh.app 15.07 MiB).
+  Packaged archive SHA256SUMS verification passes. The running app was not restarted.
+
+## 2026-10-22 — Uppercase node IDs
+
+- User approved the scoped node-ID implementation plan. Root cause: the form
+  allowed RTX3070, while shared lowercase-only entity validation rejected it.
+- Node IDs and filename stems now preserve ASCII case in schemas 1/2. Jump
+  references accept the same format and resolve exactly. Other entity IDs remain
+  lowercase. No migration or automatic rename; older apps may reject uppercase IDs.
+- Core load/preview/commit rejects case-only duplicates with a static, specific
+  conflict message, including imports/replacements and wrong-case edit/removal.
+  Malformed IDs receive a specific static format error. Form constraints/help
+  mirror the core rule, including the 64-character limit and first character.
+- Formatting, warnings-denied workspace Clippy, all 103 Rust tests (3 opt-in tests
+  skipped), generated-contract freshness and production frontend build pass.
+  Regressions cover create/update/import/replace/remove/reopen in both schemas,
+  exact-case jumps, invalid IDs and collision attempts leaving saved bytes intact.
+- Both targeted browser node workflows pass using installed Chrome via a temporary
+  test configuration. Default Playwright browser was absent; its stalled download
+  was stopped. Browser fixtures verify form/review behavior, not native persistence.
+- macOS arm64 v0.1.5 release rebuilt (Ghosh.app 15.07 MiB). Applied a complete local
+  ad-hoc bundle signature after the linker-only signature failed strict verification;
+  strict signature verification now passes. Repackaged archive/checksum verification
+  passes. The running desktop app and open draft were not restarted or changed.

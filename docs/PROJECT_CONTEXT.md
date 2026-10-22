@@ -14,9 +14,13 @@
 - Real local PTY/emulator and manual SSH to both authorized targets pass native smoke.
 - Managed direct SSH authentication and PTYs connect immediately; native exact-key checks remain.
 - File keys, encrypted keys and SSH agent passed live tests; per-call password is implemented.
-- Simple checked scenarios, Shell/Python/Deno and upstream Ansible run locally/over SSH.
+- Simple checked scenarios, Shell/Python/Deno, notebook cells and upstream Ansible run locally/over SSH.
 - ComfyUI wizard generates standard Ansible for pinned plugins and checksum-verified models.
-- Browser sessions, monitoring, durable schedules and MCP execution remain pending.
+- Multistep Playbooks have stable ordered steps, inline output, Run step/all and optional checks.
+- Modeless run output permits independent SSH terminals; finished Runs can be cleared.
+- System authentication uses existing per-host file keys without setup or agent fallback.
+- Run saved multistep Playbooks to execute their steps; legacy Check reports remain readable.
+- Browser sessions, durable schedules and MCP execution remain pending.
 
 ## Read first and navigate
 - Six memory files summarize actual behavior; keep them short and current.
@@ -27,7 +31,7 @@
 - [TASK_LOG.md](TASK_LOG.md) records real checks and remaining verification gaps.
 - [IMPLEMENTATION_PLAN_M1.md](IMPLEMENTATION_PLAN_M1.md) records approved scope/outcome.
 - [IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md](IMPLEMENTATION_PLAN_OPERATIONAL_WORKFLOWS.md)
-  is approved: lifecycle/default approval, direct SSH PTYs and Ansible implemented; timers/monitoring and expanded workflows pending.
+  is approved: lifecycle/default approval, direct SSH PTYs and Ansible implemented; timers and expanded workflows pending; independent Monitor is implemented.
 - Full target architecture: ARCHITECTURE.md; sequencing: MILESTONES.md.
 - Target schemas/API: WORKSPACE_SCHEMA.md, SCRIPTING_API.md, MCP_SURFACE.md.
 - User source: ghosh-prompt.md (user-owned, intentionally ignored by Git).
@@ -55,6 +59,8 @@
 - Schema 2 adds opaque file-key bindings; explicit migration retains manifest backup.
 - Opening legacy schema 1 is inert and does not export Keychain identities.
 - Flat node inventory validates IDs/auth/jump chains/tunnel references.
+- Node IDs preserve ASCII case (e.g. RTX3070), are unique ignoring case, and use
+  exact-case jump references. Other entity IDs remain lowercase.
 - Profile stores must parse as UUID, be distinct, and remain immutable while loaded.
 - Future entity fields are preserved; full activation validation belongs to later services.
 - Unknown TOML keys/comments survive display-name edits through toml_edit.
@@ -102,7 +108,7 @@
 - Remote child views have no privileged IPC grants; none exist in M1.1.
 
 ## Automation authoring
-- Playbooks/Scripts catalogs support create, paste, examples, edit, validate, save and recoverable remove.
+- Playbooks exposes only multistep documents; Recipes remains separate and legacy files/history are preserved.
 - Flat YAML/Ansible links and Shell/Python/Deno sources are revision-bound, at most 256 KiB each.
 - Invalid external sources open inert with validation issues; they cannot be saved through the editor.
 - Simple schema: 1 scenarios support check/shell/verify and bounded handlers, without Ansible.
@@ -154,6 +160,8 @@
 - Existing Keychain-only SecretRef stays separate from implemented file-key registry.
 - Registry is user-local ssh/registry.json; managed ssh/<uuid>.key files are 0600/0700.
 - Effective file key: node > workspace > global; explicit missing key cannot fall back.
+- New node drafts default to System keys; legacy Agent/no-socket nodes use System keys.
+- Explicit file keys, schema-2 agents, custom sockets and passwords retain their authentication method.
 - Encrypted files retain encryption; per-connection unlock works without saving passphrases.
 - Local PTY exists and passed local/native manual SSH tests on debian.orb.local
   and node3.dabaga.cc. Managed authentication also passed on both, including native UI.
@@ -186,7 +194,7 @@
 - Approve a concrete plan before the next software increment; avoid future scaffolding.
 - Keep small coherent changes; preserve user-owned prompt and .gitignore entries.
 - User requested sequential work: no parallel agents or builds for this increment.
-- Latest checks: formatting/Clippy, 88 Rust tests (3 opt-in skipped), 32 browser UI tests, contract freshness.
+- Latest checks: formatting/Clippy, 99 Rust tests (3 opt-in skipped), 41 browser UI tests, contract freshness.
 - Separate upstream controller integration and read-only Ansible over SSH passed on both authorized nodes.
 - Arm64 release built; native local/Debian/node3 TTY tests pass, screenshots in README.
 - Browser IPC fixtures verify presentation; they do not prove native execution.
@@ -196,3 +204,17 @@
 - Native 200% shell captured; minimum macOS 14 and broad terminal layout matrix pending.
 - Tag-only macOS CI remains enabled; Linux job stays commented out. Signing/notarization are not configured.
 - Update memory/contracts/task evidence whenever behavior or scope changes.
+
+## Current Playbook defaults
+- New Playbook uses ordered multistep Shell/Python/Deno steps, whole-window authoring
+  and per-step expansion; stable IDs survive drag reorder and source transfer.
+- Step timeout 0 is unlimited (code and check); legacy -1 remains accepted; finite values are 1..3600 seconds.
+- Import/file drop opens an inert draft; export preserves complete saved source.
+- System SSH files are the default, including old schema-1 Agent/no-socket nodes.
+  Explicit registered keys, schema-2 agents, custom sockets and passwords stay explicit.
+
+- Save/Cmd+S performs preview+commit without a Validate prerequisite; lint is advisory.
+- Restore example Playbooks recreates missing IDs only; never overwrites edited examples.
+- Monitor owns an independent local/SSH connection, bounded logs and visible-only resource probes.
+- Runs contains execution history only; Terminal X/Cmd+W closes one session with confirmation.
+- Cmd+Shift+brackets cycles terminal sessions; held Cmd+Option shows shared shortcut help.

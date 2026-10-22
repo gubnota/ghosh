@@ -16,8 +16,13 @@ commands.allow = ["nodes_list", "nodes_preview", "nodes_commit", "node_connectio
 [[permission]]
 identifier = "allow-keys"
 description = "Review file-key metadata and register explicit user-selected files from the local main shell."
-commands.allow = ["keys_list", "keys_preview", "keys_commit", "keys_default", "keys_forget", "keys_pick", "keys_generate", "keys_relink", "workspace_key", "workspace_key_preview", "workspace_key_commit", "node_identity"]
+commands.allow = ["system_key_candidates", "keys_list", "keys_preview", "keys_commit", "keys_default", "keys_forget", "keys_pick", "keys_generate", "keys_relink", "workspace_key", "workspace_key_preview", "workspace_key_commit", "node_identity"]
 [[permission]]
 identifier = "allow-terminal"
 description = "Open explicit local and reviewed SSH PTY sessions from the local main shell."
 commands.allow = ["terminal_open_local", "terminal_open_node", "terminal_poll", "terminal_input", "terminal_resize", "terminal_close"]
+
+[[permission]]
+identifier = "allow-monitor"
+description = "Ephemeral local human monitoring"
+commands.allow = ["monitor_open", "monitor_poll", "monitor_start", "monitor_close"]

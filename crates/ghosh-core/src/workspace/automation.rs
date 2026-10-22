@@ -43,7 +43,9 @@ pub(super) fn source_kind(manifest: &Manifest, path: &str) -> Option<AutomationK
     let path = Path::new(path);
     let filename = path.file_name()?.to_str()?;
     if path.parent() == Some(Path::new(&manifest.paths.playbooks)) {
-        if filename.ends_with(".ansible.yml") {
+        if filename.ends_with(".steps.yml") {
+            Some(AutomationKind::Notebook)
+        } else if filename.ends_with(".ansible.yml") {
             Some(AutomationKind::Ansible)
         } else if filename.ends_with(".yml") || filename.ends_with(".yaml") {
             Some(AutomationKind::Playbook)
@@ -51,6 +53,9 @@ pub(super) fn source_kind(manifest: &Manifest, path: &str) -> Option<AutomationK
             None
         }
     } else if path.parent() == Some(Path::new(&manifest.paths.scripts)) {
+        if filename.ends_with(".steps.yml") {
+            return Some(AutomationKind::Notebook);
+        }
         match path.extension()?.to_str()? {
             "sh" => Some(AutomationKind::Shell),
             "py" => Some(AutomationKind::Python),
@@ -65,6 +70,8 @@ fn source_id(path: &str, kind: AutomationKind) -> Option<String> {
     let name = Path::new(path).file_name()?.to_str()?;
     let id = if kind == AutomationKind::Ansible {
         name.strip_suffix(".ansible.yml")?
+    } else if kind == AutomationKind::Notebook {
+        name.strip_suffix(".steps.yml")?
     } else {
         Path::new(name).file_stem()?.to_str()?
     };

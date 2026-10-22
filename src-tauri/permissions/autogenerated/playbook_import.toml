@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-playbook-import"
+description = "Enables the playbook_import command without any pre-configured scope."
+commands.allow = ["playbook_import"]
+
+[[permission]]
+identifier = "deny-playbook-import"
+description = "Denies the playbook_import command without any pre-configured scope."
+commands.deny = ["playbook_import"]

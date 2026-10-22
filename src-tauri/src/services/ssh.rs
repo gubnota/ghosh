@@ -13,10 +13,22 @@ pub(super) struct Review {
     identity: IdentityPreview,
     host: HostRecord,
     agent_socket: Option<PathBuf>,
+    system_key: Option<KeyImportPreview>,
     created: Instant,
 }
 fn denied() -> AppError {
     AppError::new(ErrorCode::Denied)
+}
+fn system_identity_path(home: &std::path::Path, host: &str) -> Result<PathBuf> {
+    if host.ends_with(".orb.local") {
+        return Ok(home.join(".orbstack/ssh/id_ed25519"));
+    }
+    let ed = home.join(".ssh/id_ed25519");
+    match fs::symlink_metadata(&ed) {
+        Ok(_) => Ok(ed),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(home.join(".ssh/id_rsa")),
+        Err(_) => Err(AppError::new(ErrorCode::KeyUnavailable)),
+    }
 }
 fn endpoint(node: &Node) -> Endpoint {
     Endpoint {
@@ -113,6 +125,25 @@ fn known_hosts() -> Result<Vec<String>> {
 }
 
 impl Services {
+    pub(super) fn system_identity(&self, node: &Node) -> Result<KeyImportPreview> {
+        let home = PathBuf::from(std::env::var_os("HOME").ok_or_else(denied)?);
+        let path = system_identity_path(&home, &node.host)?;
+        self.preview_key(KeyImportRequest {
+            label: "System key".into(),
+            path: path.to_string_lossy().into_owned(),
+            storage: KeyStorage::Reference,
+        })
+    }
+    fn resolve_system_key(
+        &self,
+        workspace: &str,
+        key: &KeyImportPreview,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+        let access = SecretAccess::authorize(Principal::NativeService, workspace, true)?;
+        self.with_keys(|keys| {
+            keys.resolve_preview(&access, key, &crate::platform::ssh_keys::OpenSshInspector)
+        })
+    }
     pub(super) fn runner_identity(
         &self,
         request: &NodeConnectionRequest,
@@ -123,7 +154,19 @@ impl Services {
         let active = guard.as_ref().ok_or_else(denied)?;
         let keys = self.keys()?;
         let (node, identity) = prepare(active, request, &keys)?;
-        match node.auth.method {
+        match node.effective_auth_method() {
+            AuthMethod::System => {
+                let reviews = self.ssh_reviews.lock().map_err(poisoned)?;
+                let key = reviews
+                    .iter()
+                    .find(|r| r.ticket == ticket && r.request.node_id == request.node_id)
+                    .and_then(|r| r.system_key.as_ref())
+                    .ok_or_else(denied)?;
+                let private = self.resolve_system_key(&request.context.workspace_id, key)?;
+                Ok(
+                    serde_json::json!({"ssh_key": std::str::from_utf8(&private).map_err(|_| denied())?}),
+                )
+            }
             AuthMethod::Key => {
                 let access = SecretAccess::authorize(
                     Principal::NativeService,
@@ -173,7 +216,15 @@ impl Services {
                 let (node, identity) = prepare(active, &request, &self.keys()?)?;
                 (node, identity, active.context.session_id.clone())
             };
-            let agent_socket = if matches!(node.auth.method, AuthMethod::Agent) {
+            let system_key = if matches!(node.effective_auth_method(), AuthMethod::System) {
+                let key = self.system_identity(&node)?;
+                identity.public = Some(key.public.clone());
+                identity.status = Some(KeyStatus::Available);
+                Some(key)
+            } else {
+                None
+            };
+            let agent_socket = if matches!(node.effective_auth_method(), AuthMethod::Agent) {
                 let socket = node
                     .auth
                     .agent_socket
@@ -220,6 +271,8 @@ impl Services {
                 host_key: connection.host.preview.clone(),
                 credential_prompt: if matches!(node.auth.method, AuthMethod::Password) {
                     Some("SSH password".into())
+                } else if system_key.as_ref().is_some_and(|key| key.encrypted) {
+                    Some("Key passphrase".into())
                 } else {
                     self.keys()?
                         .keys
@@ -237,6 +290,7 @@ impl Services {
                 identity,
                 host: connection.host,
                 agent_socket,
+                system_key,
                 created: Instant::now(),
             });
             Ok(preview)
@@ -328,7 +382,14 @@ impl Services {
             .as_ref()
             .map(|value| std::str::from_utf8(value.expose()).map_err(|_| denied()))
             .transpose()?;
-        match node.auth.method {
+        match node.effective_auth_method() {
+            AuthMethod::System => {
+                let private = self.resolve_system_key(
+                    &review.request.context.workspace_id,
+                    review.system_key.as_ref().ok_or_else(denied)?,
+                )?;
+                connection.authenticate_file(&node.user, &private, credential_text, cancel)?;
+            }
             AuthMethod::Key => {
                 let access = SecretAccess::authorize(
                     Principal::NativeService,
@@ -433,6 +494,31 @@ mod tests {
         require_file_identity(&identity).unwrap();
     }
 
+    #[test]
+    fn system_identity_selection_is_host_specific_without_unsafe_fallback() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path();
+        fs::create_dir(home.join(".ssh")).unwrap();
+        assert_eq!(
+            system_identity_path(home, "node.example").unwrap(),
+            home.join(".ssh/id_rsa")
+        );
+        fs::write(home.join(".ssh/id_ed25519"), b"placeholder").unwrap();
+        assert_eq!(
+            system_identity_path(home, "node.example").unwrap(),
+            home.join(".ssh/id_ed25519")
+        );
+        fs::remove_file(home.join(".ssh/id_ed25519")).unwrap();
+        std::os::unix::fs::symlink("missing", home.join(".ssh/id_ed25519")).unwrap();
+        assert_eq!(
+            system_identity_path(home, "node.example").unwrap(),
+            home.join(".ssh/id_ed25519")
+        );
+        assert_eq!(
+            system_identity_path(home, "debian.orb.local").unwrap(),
+            home.join(".orbstack/ssh/id_ed25519")
+        );
+    }
     /// Explicit opt-in only. Uses existing verified host trust and a referenced
     /// current-user key. Creates only disposable local workspace/registry files.
     #[test]
@@ -443,22 +529,27 @@ mod tests {
         let service =
             Services::new(root.join("data"), Arc::new(DocumentOpenQueue::default())).unwrap();
         let home = PathBuf::from(std::env::var_os("HOME").unwrap());
-        let path = std::env::var("GHOSH_SMOKE_KEY")
-            .unwrap_or_else(|_| home.join(".ssh/id_ed25519").to_string_lossy().into());
-        let preview = service
-            .preview_key(KeyImportRequest {
-                path,
-                label: "Authorized smoke identity".into(),
-                storage: KeyStorage::Reference,
-            })
-            .unwrap();
-        let keys = service
-            .commit_key(KeyCommitRequest {
-                preview,
-                revision: service.keys().unwrap().revision,
-            })
-            .unwrap();
-        let key_id = keys.keys[0].id.clone();
+        let use_system = std::env::var_os("GHOSH_SMOKE_SYSTEM").is_some();
+        let key_id = if use_system {
+            None
+        } else {
+            let path = std::env::var("GHOSH_SMOKE_KEY")
+                .unwrap_or_else(|_| home.join(".ssh/id_ed25519").to_string_lossy().into());
+            let preview = service
+                .preview_key(KeyImportRequest {
+                    path,
+                    label: "Authorized smoke identity".into(),
+                    storage: KeyStorage::Reference,
+                })
+                .unwrap();
+            let keys = service
+                .commit_key(KeyCommitRequest {
+                    preview,
+                    revision: service.keys().unwrap().revision,
+                })
+                .unwrap();
+            Some(keys.keys[0].id.clone())
+        };
         let selected = std::env::var("GHOSH_SMOKE_NODE").ok();
         let use_agent = std::env::var_os("GHOSH_SMOKE_AGENT").is_some();
         let credential = std::env::var("GHOSH_SMOKE_PASSPHRASE").ok();
@@ -477,27 +568,29 @@ mod tests {
             &Cancellation::default(),
         )
         .unwrap();
-        let snapshot = workspace.snapshot();
-        let request = WorkspaceKeyRequest {
-            context: RevisionRequest {
-                workspace_id: snapshot.id,
-                revision: snapshot.revision,
-            },
-            default_key: Some(key_id.clone()),
-        };
-        let preview = workspace
-            .preview_workspace_key(Principal::LocalUi, &request)
-            .unwrap();
-        workspace
-            .commit_workspace_key(
-                Principal::LocalUi,
-                &WorkspaceKeyCommit {
-                    request,
-                    digest: preview.digest,
+        if !use_system {
+            let snapshot = workspace.snapshot();
+            let request = WorkspaceKeyRequest {
+                context: RevisionRequest {
+                    workspace_id: snapshot.id,
+                    revision: snapshot.revision,
                 },
-                &Cancellation::default(),
-            )
-            .unwrap();
+                default_key: key_id.clone(),
+            };
+            let preview = workspace
+                .preview_workspace_key(Principal::LocalUi, &request)
+                .unwrap();
+            workspace
+                .commit_workspace_key(
+                    Principal::LocalUi,
+                    &WorkspaceKeyCommit {
+                        request,
+                        digest: preview.digest,
+                    },
+                    &Cancellation::default(),
+                )
+                .unwrap();
+        }
         for &(id, host) in &nodes {
             let snapshot = workspace.snapshot();
             let mutation = NodeMutationRequest {
@@ -507,22 +600,24 @@ mod tests {
                 },
                 change: NodeChange::Create {
                     node: Node {
-                        schema: 2,
+                        schema: if use_system { 1 } else { 2 },
                         id: id.into(),
                         host: host.into(),
                         port: 22,
                         user: "vm".into(),
                         auth: Auth {
-                            method: if use_agent {
+                            method: if use_system && !host.ends_with(".orb.local") {
+                                AuthMethod::System
+                            } else if use_system || use_agent {
                                 AuthMethod::Agent
                             } else {
                                 AuthMethod::Key
                             },
                             key_ref: None,
-                            key_id: if use_agent {
+                            key_id: if use_system || use_agent {
                                 None
                             } else {
-                                Some(key_id.clone())
+                                key_id.clone()
                             },
                             password_ref: None,
                             agent_socket: None,
@@ -699,6 +794,51 @@ mod tests {
                 Ok(())
             }).unwrap();
             eprintln!("{id}: native exec drains both streams, bounds output and preserves exit 7");
+            let snapshot = service.snapshot().unwrap().unwrap();
+            let context = RevisionRequest {
+                workspace_id: snapshot.id,
+                revision: snapshot.revision,
+            };
+            let preview = service
+                .connection_preview(NodeConnectionRequest {
+                    context: context.clone(),
+                    node_id: id.into(),
+                })
+                .unwrap();
+            let monitor = service
+                .monitor_open(ghosh_core::monitor::MonitorOpen {
+                    context,
+                    connection: Some(NodeConnectionCommit {
+                        ticket: preview.ticket,
+                        allow_unknown: false,
+                        credential: credential.clone(),
+                    }),
+                })
+                .unwrap();
+            service
+                .monitor_start(
+                    monitor.id.clone(),
+                    "printf 'GHOSH_MONITOR_OK\\n'; uname -s; sleep 2".into(),
+                )
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(15);
+            loop {
+                let packet = service.monitor_poll(monitor.id.clone(), true).unwrap();
+                if packet.output.contains("GHOSH_MONITOR_OK")
+                    && packet.metrics.cpu_percent.is_some()
+                    && packet.metrics.memory_percent.is_some()
+                    && packet.metrics.disk_percent.is_some()
+                {
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "{id}: monitor logs and resource probe deadline"
+                );
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            service.monitor_close(monitor.id.clone()).unwrap();
+            eprintln!("{id}: independent Monitor streams logs and real CPU/memory/disk metrics");
         }
         use ghosh_core::{automation::*, runs::*, workspace::automation::*};
         let service = Arc::new(service);
@@ -736,6 +876,7 @@ mod tests {
             .collect();
         let initial = service
             .run_start(RunRequest {
+                cells: vec![],
                 automation: AutomationReadRequest {
                     context: context.clone(),
                     id: "authorized-facts".into(),
@@ -763,6 +904,121 @@ mod tests {
         assert!(report.results.iter().all(|result| result.phase == "check"
             && result.output.contains("Linux")
             && result.output.contains("exec-stderr")));
+        // Saved notebook execution and an independent interactive connection must coexist.
+        let snapshot = service.snapshot().unwrap().unwrap();
+        let mutation = AutomationMutation {
+            context: RevisionRequest { workspace_id: snapshot.id, revision: snapshot.revision },
+            document: AutomationDocument {
+                id: "authorized-notebook".into(), kind: AutomationKind::Notebook,
+                source: "schema: 1\nname: Authorized notebook facts\ncells:\n  - id: shell\n    title: Shell facts\n    runtime: shell\n    code: 'printf NOTEBOOK_ACTIVE; sleep 10; uname -s'\n    timeout_s: -1\n    success_check: 'true'\n  - id: python\n    title: Python facts\n    runtime: python\n    code: 'import platform; print(platform.system())'\n    timeout_s: 15\n".into(),
+            },
+            replace: false, remove: false,
+        };
+        let preview = service.automation_preview(mutation.clone()).unwrap();
+        let snapshot = service
+            .automation_commit(AutomationCommit {
+                mutation,
+                digest: preview.digest,
+            })
+            .unwrap();
+        let context = RevisionRequest {
+            workspace_id: snapshot.id,
+            revision: snapshot.revision,
+        };
+        let node_id = nodes[0].0;
+        let preview = service
+            .connection_preview(NodeConnectionRequest {
+                context: context.clone(),
+                node_id: node_id.into(),
+            })
+            .unwrap();
+        let started = service
+            .run_start(RunRequest {
+                cells: vec![],
+                automation: AutomationReadRequest {
+                    context: context.clone(),
+                    id: "authorized-notebook".into(),
+                    kind: AutomationKind::Notebook,
+                },
+                mode: RunMode::Apply,
+                targets: vec![RunTarget {
+                    node_id: node_id.into(),
+                    connection: Some(NodeConnectionCommit {
+                        ticket: preview.ticket,
+                        allow_unknown: false,
+                        credential: credential.clone(),
+                    }),
+                }],
+                input: "{}".into(),
+                controller_python: None,
+            })
+            .unwrap();
+        assert!(service.run_active().unwrap());
+        let preview = service
+            .connection_preview(NodeConnectionRequest {
+                context: context.clone(),
+                node_id: node_id.into(),
+            })
+            .unwrap();
+        let terminal = service
+            .terminal_open_node(NodeTerminalRequest {
+                connection: NodeConnectionCommit {
+                    ticket: preview.ticket,
+                    allow_unknown: false,
+                    credential: credential.clone(),
+                },
+                dimensions: ghosh_core::terminal::TerminalSize { rows: 24, cols: 80 },
+            })
+            .unwrap();
+        assert!(
+            service.run_active().unwrap(),
+            "notebook remains active while the shell opens"
+        );
+        service
+            .terminals
+            .input(
+                &terminal.id,
+                b"unset HISTFILE; printf 'INDEPENDENT_SHELL_OK\\n'; exit\n".to_vec(),
+            )
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let mut ack = 0;
+        let mut output = Vec::new();
+        loop {
+            assert!(Instant::now() < deadline, "independent shell deadline");
+            let packet = service.terminals.poll(&terminal.id, ack).unwrap();
+            assert!(!packet.failed);
+            if packet.sequence != ack {
+                output.extend(packet.bytes);
+                ack = packet.sequence;
+            }
+            if packet.exited {
+                assert_eq!(packet.exit_code, Some(0));
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        service.terminals.close(&terminal.id).unwrap();
+        assert!(String::from_utf8_lossy(&output).contains("INDEPENDENT_SHELL_OK"));
+        let deadline = Instant::now() + Duration::from_secs(45);
+        while service.run_active().unwrap() {
+            assert!(Instant::now() < deadline, "notebook deadline");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let report = service
+            .runs_list(context)
+            .unwrap()
+            .into_iter()
+            .find(|r| r.id == started.id)
+            .unwrap();
+        assert_eq!(report.state, RunState::Succeeded, "{:?}", report.results);
+        assert_eq!(report.results.len(), 3);
+        assert!(report.results[0].output.contains("Linux"));
+        assert_eq!(report.results[1].phase, "verify");
+        assert!(report.results[2].output.contains("Linux"));
+        eprintln!(
+            "{node_id}: saved Shell/Python notebook, success check and independent PTY passed"
+        );
         if let Ok(python) = std::env::var("GHOSH_CONTROLLER_PYTHON") {
             let snapshot = service.snapshot().unwrap().unwrap();
             let mutation = AutomationMutation { context: RevisionRequest { workspace_id: snapshot.id, revision: snapshot.revision }, document: AutomationDocument { id: "ansible-facts".into(), kind: AutomationKind::Playbook, source: "- name: Authorized upstream facts\n  hosts: all\n  gather_facts: false\n  tasks:\n    - name: Read-only facts\n      ansible.builtin.shell: uname -s; uptime; printf exec-stderr >&2\n      changed_when: false\n      check_mode: false\n".into() }, replace: false, remove: false };
@@ -798,6 +1054,7 @@ mod tests {
                 .collect();
             let started = service
                 .run_start(RunRequest {
+                    cells: vec![],
                     automation: AutomationReadRequest {
                         context: context.clone(),
                         id: "ansible-facts".into(),

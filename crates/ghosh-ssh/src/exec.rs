@@ -21,7 +21,7 @@ impl Executor for Connection {
         cancel.check()?;
         if !self.reviewed
             || !self.session.authenticated()
-            || !(1..=3600).contains(&timeout_s)
+            || timeout_s > 3600
             || script.len() > 2 * 1024 * 1024
         {
             return Err(AppError::new(ErrorCode::Denied));
@@ -39,7 +39,7 @@ impl Executor for Connection {
             if cancel.check().is_err() {
                 break ExecEnd::Cancelled;
             }
-            if Instant::now() >= deadline {
+            if timeout_s != 0 && Instant::now() >= deadline {
                 break ExecEnd::TimedOut;
             }
             if offset < script.len() {

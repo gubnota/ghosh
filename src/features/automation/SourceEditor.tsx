@@ -4,13 +4,13 @@ import { api, errorMessage } from "../../app/ipc";
 import type { AutomationDocument } from "../../generated/contracts";
 
 export function SourceEditor({ document, disabled, expanded, expand, change, save }: {
-  document: AutomationDocument; disabled: boolean; expanded: boolean; expand: () => void;
+  document: AutomationDocument; disabled: boolean; expanded: boolean; expand?: () => void;
   change: (source: string) => void; save: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null), instance = useRef<editor.IStandaloneCodeEditor | null>(null);
   const current = useRef({ document, change, save }); current.current = { document, change, save };
   const [plain, setPlain] = useState(false), [ready, setReady] = useState(false), [status, setStatus] = useState("Loading offline editor…");
-  const language = document.kind === "deno" ? "typescript" : document.kind === "playbook" || document.kind === "ansible" ? "yaml" : document.kind;
+  const language = document.kind === "deno" ? "typescript" : document.kind === "playbook" || document.kind === "ansible" || document.kind === "notebook" ? "yaml" : document.kind;
   useEffect(() => {
     if (plain) return;
     let alive = true, dispose: (() => void) | undefined;
@@ -49,9 +49,9 @@ export function SourceEditor({ document, disabled, expanded, expand, change, sav
     }, 450);
     return () => { alive = false; window.clearTimeout(timer); };
   }, [document.source, document.kind, document.id, ready, plain]);
-  return <section className="source-workbench" aria-label="Script editor">
-    <div className="editor-toolbar"><strong>{document.kind === "ansible" ? "Project link · YAML" : "Source"}</strong><div className="inline-actions"><button type="button" onClick={() => setPlain(value => !value)}>{plain ? "Code editor" : "Plain text"}</button><button type="button" aria-pressed={expanded} onClick={expand}>{expanded ? "Restore editor" : "Maximize editor"}</button></div></div>
-    {plain ? <textarea id="automation-source" aria-label="Source" className="source-editor" spellCheck={false} value={document.source} disabled={disabled} onChange={event => change(event.target.value)} /> : <div ref={host} className="monaco-host" />}
-    <p className="editor-diagnostics" role="status">{status}</p><p className="field-help">⌘S Validate & save · Ctrl+Space Suggestions · Ctrl+M Switch Tab between indent and keyboard navigation · Esc Restore expanded editor</p>
+  return <section className="source-workbench" aria-label="Step code editor">
+    <div className="editor-toolbar"><strong>{document.kind === "ansible" ? "Project link · YAML" : "Source"}</strong><div className="inline-actions"><button type="button" onClick={() => setPlain(value => !value)}>{plain ? "Code editor" : "Plain text"}</button>{expand && <button type="button" aria-pressed={expanded} onClick={expand}>{expanded ? "Restore editor" : "Maximize editor"}</button>}</div></div>
+    {plain ? <textarea aria-label="Source" className="source-editor" spellCheck={false} value={document.source} disabled={disabled} onChange={event => change(event.target.value)} /> : <div ref={host} className="monaco-host" />}
+    <p className="editor-diagnostics" role="status">{status}</p><p className="field-help">⌘S Save · Ctrl+Space Suggestions · Ctrl+M Switch Tab between indent and keyboard navigation · Esc Restore expanded editor</p>
   </section>;
 }

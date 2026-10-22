@@ -256,6 +256,67 @@ impl Services {
         reports.sort_by_key(|report| std::cmp::Reverse(report.started_at));
         Ok(reports)
     }
+    pub fn runs_cleanup(&self, request: RunCleanupRequest) -> Result<usize> {
+        let guard = self.active.lock().map_err(poisoned)?;
+        let active = guard
+            .as_ref()
+            .ok_or_else(|| AppError::new(ErrorCode::Denied))?;
+        let snapshot = active.workspace.snapshot();
+        if request.context.workspace_id != snapshot.id
+            || request.context.revision != snapshot.revision
+            || snapshot.read_only
+        {
+            return Err(AppError::new(ErrorCode::Denied));
+        }
+        let root = dir(self)?;
+        let ids = if let Some(id) = &request.id {
+            vec![id.clone()]
+        } else {
+            fs::read_dir(&root)?
+                .filter_map(|e| e.ok())
+                .filter_map(|e| {
+                    e.file_name()
+                        .to_str()?
+                        .strip_suffix(".json")
+                        .map(str::to_owned)
+                })
+                .collect()
+        };
+        let mut count = 0;
+        for id in ids {
+            let report = match load(self, &id) {
+                Ok(r) => r,
+                Err(e) if request.id.is_some() => return Err(e),
+                Err(_) => continue,
+            };
+            if report.workspace_id != snapshot.id {
+                if request.id.is_some() {
+                    return Err(AppError::new(ErrorCode::Denied));
+                } else {
+                    continue;
+                }
+            }
+            let registry = self.runs.lock().map_err(poisoned)?;
+            if report.state == RunState::Running || registry.active.as_deref() == Some(&id) {
+                if request.id.is_some() {
+                    return Err(AppError::new(ErrorCode::Busy));
+                } else {
+                    continue;
+                }
+            }
+            // UUIDs are validated by load; unlink only these two workspace-owned artifacts.
+            match fs::remove_file(root.join(format!("{id}.jsonl"))) {
+                Ok(()) => (),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+                Err(e) => return Err(e.into()),
+            }
+            fs::remove_file(root.join(format!("{id}.json")))?;
+            count += 1;
+        }
+        #[cfg(unix)]
+        fs::File::open(root)?.sync_all()?;
+        Ok(count)
+    }
     pub fn run_stop(&self, id: String) -> Result<()> {
         let report = load(self, &id)?;
         if self
@@ -286,6 +347,11 @@ impl Services {
             if !validate(&document).valid
                 || document.kind.is_script() && request.mode != RunMode::Apply
             {
+                return Err(invalid());
+            }
+            if document.kind == AutomationKind::Notebook {
+                notebook_cells(&parse_notebook(&document.source)?, &request.cells)?;
+            } else if !request.cells.is_empty() {
                 return Err(invalid());
             }
             let mut seen = BTreeSet::new();
@@ -350,6 +416,9 @@ impl Services {
                         Some(
                             if document.kind == AutomationKind::Playbook {
                                 parse_playbook(&document.source)?.tasks.len()
+                            } else if document.kind == AutomationKind::Notebook {
+                                notebook_cells(&parse_notebook(&document.source)?, &request.cells)?
+                                    .len()
                             } else {
                                 1
                             } * request.targets.len(),
@@ -395,6 +464,8 @@ impl Services {
                     let mut emit = |value| append(&service, &mut report, value, &request.input);
                     let result = if document.kind == AutomationKind::Playbook {
                         run_playbook(&mut verified, &parse_playbook(&document.source)?, &node_id, request.mode, cancel, &mut emit)
+                    } else if document.kind == AutomationKind::Notebook {
+                        run_notebook(&mut verified, &parse_notebook(&document.source)?, &request.cells, &request.input, &node_id, cancel, &mut emit)
                     } else { run_script(&mut verified, &document, &request.input, &node_id, cancel, &mut emit) };
                     if let Err(error) = result {
                         append(&service, &mut report, TaskResult { node_id: node_id.clone(), name: document.id.clone(), state: if error.code == ErrorCode::Cancelled { TaskState::Stopped } else { TaskState::Failed }, phase: "execution".into(), output: error.message.clone(), exit_code: None, truncated: false }, &request.input)?;
@@ -414,6 +485,7 @@ impl Services {
             if let Some(progress) = &mut report.progress { progress.output.clear(); }
             report.finished_at = Some(now());
             report.message = match report.state {
+                RunState::Succeeded if request.mode == RunMode::Check => if report.results.iter().any(|r| r.state == TaskState::Drift || r.state == TaskState::Changed) { "Check complete — changes needed. No Apply was requested. Choose Apply to make changes." } else { "Check complete — no changes reported. No Apply was requested." },
                 RunState::Succeeded if uses_ansible(&document) => "Ansible finished. Check reports predicted changes; validation and handlers follow the original playbook.",
                 RunState::Succeeded => "Finished. Check results may include drift; Apply verifies every changed task.",
                 RunState::Stopped => "Stopped before the next invocation. Completed changes remain applied.",
@@ -531,6 +603,7 @@ mod tests {
             tmp,
             service,
             RunRequest {
+                cells: vec![],
                 automation: AutomationReadRequest {
                     context,
                     id: "smoke".into(),
@@ -638,6 +711,7 @@ mod tests {
         assert!(
             service
                 .run_start(RunRequest {
+                    cells: vec![],
                     automation: AutomationReadRequest {
                         context: RevisionRequest {
                             workspace_id: snapshot.id,
@@ -696,6 +770,7 @@ mod tests {
         let mut automation = request.automation;
         automation.context.revision = snapshot.revision;
         let make = |mode| RunRequest {
+            cells: vec![],
             automation: automation.clone(),
             mode,
             targets: vec![RunTarget {
@@ -812,6 +887,7 @@ mod tests {
         let source = serde_json::json!({"schema":1,"name":"Real idempotence", "tasks":[main], "handlers":{"notice":task(&notice)}}).to_string();
         let (_tmp, service, request) = fixture(&source, AutomationKind::Playbook);
         let make_request = |mode| RunRequest {
+            cells: vec![],
             automation: request.automation.clone(),
             mode,
             targets: vec![RunTarget {
@@ -826,6 +902,7 @@ mod tests {
         assert_eq!(check.state, RunState::Succeeded);
         assert_eq!(check.results[0].state, TaskState::Drift);
         assert!(!target.exists());
+        assert!(check.message.contains("changes needed"));
         assert!(!notice.exists());
         let apply = service.run_start(make_request(RunMode::Apply)).unwrap();
         let apply = wait(&service, &apply.id);
@@ -849,6 +926,171 @@ mod tests {
         assert_eq!(repeat.state, RunState::Succeeded);
         assert_eq!(repeat.results.len(), 1);
         assert_eq!(repeat.results[0].state, TaskState::Ok);
+    }
+    #[test]
+    fn notebook_saved_subset_order_verification_and_failure() {
+        let files = tempfile::tempdir().unwrap();
+        let target = files.path().join("cells");
+        let cell = |id: &str, code: String, check: Option<String>| serde_json::json!({"id":id,"title":id,"runtime":"shell","code":code,"timeout_s":3,"success_check":check});
+        let source = serde_json::json!({"schema":1,"name":"Cells","cells":[
+            cell("first", format!("printf first >> {}", quote(target.to_str().unwrap())), None),
+            cell("second", format!("printf second >> {}", quote(target.to_str().unwrap())), Some(format!("test -f {}",quote(target.to_str().unwrap())))),
+            cell("fail", "exit 7".into(), None),
+            cell("never", format!("printf never >> {}", quote(target.to_str().unwrap())), None)
+        ]}).to_string();
+        let (_tmp, service, mut request) = fixture(&source, AutomationKind::Notebook);
+        request.cells = vec!["missing".into()];
+        assert!(
+            service
+                .run_start(serde_json::from_value(serde_json::to_value(&request).unwrap()).unwrap())
+                .is_err()
+        );
+        request.cells = vec!["second".into(), "first".into()];
+        let initial = service
+            .run_start(serde_json::from_value(serde_json::to_value(&request).unwrap()).unwrap())
+            .unwrap();
+        let report = wait(&service, &initial.id);
+        assert_eq!(report.state, RunState::Succeeded, "{report:?}");
+        assert_eq!(fs::read_to_string(&target).unwrap(), "firstsecond");
+        assert_eq!(report.progress.unwrap().completed_steps, 2);
+        assert_eq!(report.results[0].name, "first · first");
+        assert_eq!(report.results[2].phase, "verify");
+        request.cells = vec!["fail".into(), "never".into()];
+        let initial = service.run_start(request).unwrap();
+        let report = wait(&service, &initial.id);
+        assert_eq!(report.state, RunState::Failed);
+        assert_eq!(report.results.len(), 1);
+        assert_eq!(fs::read_to_string(&target).unwrap(), "firstsecond");
+    }
+    #[test]
+    fn bundled_playbooks_success_failure_timeout_and_unlimited() {
+        let files = tempfile::tempdir().unwrap();
+        let source = include_str!("../../../examples/playbooks/steps-success.steps.yml").replace(
+            "/tmp/ghosh-playbook-example",
+            files.path().to_str().unwrap(),
+        );
+        let (_tmp, service, request) = fixture(&source, AutomationKind::Notebook);
+        let initial = service.run_start(request).unwrap();
+        let report = wait(&service, &initial.id);
+        assert_eq!(report.state, RunState::Succeeded, "{report:?}");
+        assert_eq!(
+            fs::read_to_string(files.path().join("output.txt")).unwrap(),
+            "Hello from Ghosh\n"
+        );
+        assert_eq!(report.progress.unwrap().completed_steps, 3);
+        for (source, state) in [
+            (
+                include_str!("../../../examples/playbooks/steps-failure.steps.yml"),
+                RunState::Failed,
+            ),
+            (
+                include_str!("../../../examples/playbooks/steps-timeout.steps.yml"),
+                RunState::OutcomeUnknown,
+            ),
+        ] {
+            let (_tmp, service, request) = fixture(source, AutomationKind::Notebook);
+            let initial = service.run_start(request).unwrap();
+            let report = wait(&service, &initial.id);
+            assert_eq!(report.state, state, "{report:?}");
+            assert!(
+                !report
+                    .results
+                    .iter()
+                    .any(|r| r.name.starts_with("skipped") || r.name.starts_with("unlimited"))
+            );
+        }
+        let source = include_str!("../../../examples/playbooks/steps-timeout.steps.yml");
+        let (_tmp, service, mut request) = fixture(source, AutomationKind::Notebook);
+        request.cells = vec!["unlimited".into()];
+        let initial = service.run_start(request).unwrap();
+        let report = wait(&service, &initial.id);
+        assert_eq!(report.state, RunState::Succeeded, "{report:?}");
+        // Unlimited steps still honor Stop.
+        let source = source.replace("sleep 5;", "sleep 30;");
+        let (_tmp, service, mut request) = fixture(&source, AutomationKind::Notebook);
+        request.cells = vec!["unlimited".into()];
+        let initial = service.run_start(request).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        service.run_stop(initial.id.clone()).unwrap();
+        assert_eq!(wait(&service, &initial.id).state, RunState::OutcomeUnknown);
+    }
+    #[test]
+    fn cleanup_is_workspace_scoped_rejects_active_and_removes_events() {
+        let (_tmp, service, request) = fixture("echo ready", AutomationKind::Shell);
+        let context = request.automation.context.clone();
+        let initial = service
+            .run_start(serde_json::from_value(serde_json::to_value(&request).unwrap()).unwrap())
+            .unwrap();
+        let report = wait(&service, &initial.id);
+        let root = dir(&service).unwrap();
+        assert!(root.join(format!("{}.jsonl", report.id)).exists());
+        let mut foreign = report.clone();
+        foreign.id = uuid::Uuid::new_v4().to_string();
+        foreign.workspace_id = "other".into();
+        save(&service, &foreign, None).unwrap();
+        assert_eq!(
+            service
+                .runs_cleanup(RunCleanupRequest {
+                    context: context.clone(),
+                    id: Some(foreign.id.clone())
+                })
+                .unwrap_err()
+                .code,
+            ErrorCode::Denied
+        );
+        assert!(
+            service
+                .runs_cleanup(RunCleanupRequest {
+                    context: context.clone(),
+                    id: Some("../bad".into())
+                })
+                .is_err()
+        );
+        let mut stale = context.clone();
+        stale.revision = "stale".into();
+        assert!(
+            service
+                .runs_cleanup(RunCleanupRequest {
+                    context: stale,
+                    id: None
+                })
+                .is_err()
+        );
+        assert_eq!(
+            service
+                .runs_cleanup(RunCleanupRequest {
+                    context: context.clone(),
+                    id: None
+                })
+                .unwrap(),
+            1
+        );
+        assert!(!root.join(format!("{}.json", report.id)).exists());
+        assert!(!root.join(format!("{}.jsonl", report.id)).exists());
+        assert!(root.join(format!("{}.json", foreign.id)).exists());
+        // Registry ownership must protect a report even while final state is being saved.
+        let mut active = report.clone();
+        active.id = uuid::Uuid::new_v4().to_string();
+        save(&service, &active, None).unwrap();
+        service.runs.lock().unwrap().active = Some(active.id.clone());
+        assert_eq!(
+            service
+                .runs_cleanup(RunCleanupRequest {
+                    context: context.clone(),
+                    id: Some(active.id.clone())
+                })
+                .unwrap_err()
+                .code,
+            ErrorCode::Busy
+        );
+        assert_eq!(
+            service
+                .runs_cleanup(RunCleanupRequest { context, id: None })
+                .unwrap(),
+            0
+        );
+        assert!(root.join(format!("{}.json", active.id)).exists());
+        service.runs.lock().unwrap().active = None;
     }
     #[test]
     fn stop_reaps_local_group_and_blocks_workspace_changes_while_running() {

@@ -43,8 +43,13 @@ homelab.ghosh/
 
 - `schema` is an integer on each independent document. Workspace/node support 1/2;
   other entity projections remain version 1. Schema-2 workspaces permit unchanged v1 nodes.
-- Workspace ID is a canonical ULID, generated once. Entity IDs and filenames match
-  `[a-z0-9][a-z0-9_-]{0,63}`. IDs are unique within each entity type.
+- Workspace ID is a canonical ULID, generated once. Node IDs and filename stems match
+  `[A-Za-z0-9][A-Za-z0-9_-]{0,63}`, preserving ASCII capitalization. Node IDs must
+  be unique ignoring ASCII case for portability across filesystems; jump references
+  use the exact saved capitalization. Other entity IDs/filename stems remain
+  `[a-z0-9][a-z0-9_-]{0,63}`, unique within each type.
+- This node-ID rule applies to schemas 1/2 without migration. Older application
+  versions may reject workspaces containing uppercase node IDs.
 - Profile `data_store` must parse as a UUID; reject malformed values on load.
   Create a random UUID v4 once per profile, serialize canonically, and keep it
   immutable for that profile. Distinct profiles cannot reuse a store identifier.

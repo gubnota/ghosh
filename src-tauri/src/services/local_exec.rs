@@ -103,7 +103,7 @@ fn run_command_streaming(
             if cancel.check().is_err() {
                 break ExecEnd::Cancelled;
             }
-            if Instant::now() >= deadline {
+            if timeout_s != 0 && Instant::now() >= deadline {
                 break ExecEnd::TimedOut;
             }
             if let Some(stdin) = &mut input {

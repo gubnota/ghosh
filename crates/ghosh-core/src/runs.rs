@@ -43,6 +43,9 @@ pub struct RunTarget {
 }
 #[derive(Serialize, Deserialize, TS)]
 pub struct RunRequest {
+    /// Empty selects all saved notebook cells, otherwise unique existing cell IDs.
+    #[serde(default)]
+    pub cells: Vec<String>,
     pub automation: AutomationReadRequest,
     pub mode: RunMode,
     pub targets: Vec<RunTarget>,
@@ -106,7 +109,7 @@ pub struct ExecOutput {
     pub output: Vec<u8>,
     pub truncated: bool,
 }
-/// One bounded invocation. Adapters must drain both streams and observe cancellation.
+/// One invocation. Internal timeout 0 means unlimited; adapters still observe cancellation.
 pub trait Executor {
     fn step_started(&mut self, _name: &str, _handler: bool) {}
     fn step_finished(&mut self, _handler: bool) {}
@@ -377,6 +380,85 @@ pub fn run_script(
     emit(result(node, &document.id, "script", out, true))?;
     executor.step_finished(false);
     Ok(())
+}
+/// Validate selections before any credential ticket is consumed or worker starts.
+pub fn notebook_cells<'a>(
+    book: &'a Notebook,
+    selected: &[String],
+) -> Result<Vec<&'a NotebookCell>> {
+    let ids: BTreeSet<_> = selected.iter().collect();
+    if ids.len() != selected.len()
+        || ids
+            .iter()
+            .any(|id| !book.cells.iter().any(|c| &c.id == *id))
+    {
+        return Err(AppError::new(ErrorCode::InvalidDocument));
+    }
+    Ok(book
+        .cells
+        .iter()
+        .filter(|c| ids.is_empty() || ids.contains(&c.id))
+        .collect())
+}
+pub fn run_notebook(
+    executor: &mut dyn Executor,
+    book: &Notebook,
+    selected: &[String],
+    input: &str,
+    node: &str,
+    cancel: &Cancellation,
+    emit: &mut dyn FnMut(TaskResult) -> Result<()>,
+) -> Result<()> {
+    for cell in notebook_cells(book, selected)? {
+        cancel.check()?;
+        let name = format!("{} · {}", cell.id, cell.title);
+        executor.step_started(&name, false);
+        let out = invoke(
+            executor,
+            &script_payload(cell.runtime, &cell.code, input)?,
+            if cell.timeout_s == -1 {
+                0
+            } else {
+                cell.timeout_s as u32
+            },
+            cancel,
+            "cell",
+        )?;
+        let value = result(node, &name, "cell", out, true);
+        let stop = failed(value.state);
+        emit(value)?;
+        if stop {
+            return Ok(());
+        }
+        if let Some(check) = &cell.success_check {
+            let out = invoke(
+                executor,
+                &script_payload(AutomationKind::Shell, check, input)?,
+                if cell.timeout_s == -1 {
+                    0
+                } else {
+                    cell.timeout_s as u32
+                },
+                cancel,
+                "verify",
+            )?;
+            let value = result(node, &name, "verify", out, false);
+            let stop = failed(value.state);
+            emit(value)?;
+            if stop {
+                return Ok(());
+            }
+        }
+        executor.step_finished(false);
+    }
+    Ok(())
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RunCleanupRequest {
+    pub context: RevisionRequest,
+    /// None clears finished reports in this workspace; Some removes exactly one.
+    pub id: Option<String>,
 }
 /// Hold a possible partial input value back until more bytes arrive. Redraw a
 /// bounded prefix instead of redacting chunks independently (which leaks splits).

@@ -408,3 +408,76 @@ Consequences: Offline lazy editor adds bundle size. No daemon, app-exit continua
 Navigation is independent of native workers; workspace mutation/close remains blocked while active.
 Related files: src/features/automation/SourceEditor.tsx, editorRuntime.ts, RunsView.tsx,
 src-tauri/src/services/source_lint.rs, runs.rs, crates/ghosh-core/src/runs.rs.
+
+# ADR-0026: Saved notebook cells and independent run monitoring
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: Checked scenarios confused inspection success with applied changes; existing
+agent nodes needed reviewed file identities. Operators need reusable script steps and
+SSH access while a task runs.
+Decision: Add versioned .steps.yml cells through the existing sequential run executor.
+Use fresh processes and stable IDs, direct code execution plus optional verification.
+Explain Check drift and offer Apply. Compose per-node file-key setup from existing
+reviewed APIs. Keep a modeless bounded-output monitor and permit independent SSH PTYs.
+Serialize native history cleanup with worker start and protect active/foreign reports.
+Consequences: No shared kernel state, automatic agent fallback, daemon or simultaneous
+automation runs. Existing workspaces require explicit identity review/migration.
+Related files: crates/ghosh-core/src/automation.rs, runs.rs; src-tauri/src/services/runs.rs;
+src/features/automation/NotebookEditor.tsx, RunMonitor.tsx; src/features/keys/SystemKeySetup.tsx.
+
+# ADR-0027: Default Multistep Playbooks and direct system identities
+
+Date: 2026-10-19
+Status: Accepted
+
+Context: Operators need whole-window Playbooks, portable examples and working default
+SSH connections without agent setup.
+Decision: Present notebook kind as the default Multistep Playbook, store new sources
+in playbooks/ and edit legacy scripts/*.steps.yml in place. Keep stable step IDs,
+full-window editor/step views, drag/keyboard ordering and separate active-step activity.
+Transfer exact source through inert imports and explicit exports. Accept step timeout
+-1 for unlimited code and success checks; cancellation remains active. Use native-safe
+current-user system files for new nodes and schema-1 Agent/no-socket compatibility,
+with host-specific OrbStack selection and pinned file revalidation.
+Consequences: Supersedes ADR-0026 setup-wizard/default-location choices. Explicit
+schema-2 Agent/custom sockets and registered keys remain supported. No shared kernel,
+runtime installation, automatic execution on import or rollback guarantee.
+Related files: docs/IMPLEMENTATION_PLAN_PLAYBOOK_DEFAULTS.md; src/features/automation/;
+src-tauri/src/services/ssh.rs, automation.rs; crates/ghosh-core/src/workspace/identity.rs.
+
+# ADR-0031: Multistep-only authoring and independent Monitor
+
+Date: 2026-10-20
+Status: Accepted
+
+Context: User requested execution-only Runs, a Monitor replacing Scripts, simpler
+saving, recoverable examples and easier terminal navigation.
+Decision: Keep multistep as the only Playbook authoring format, preserve legacy
+files/reports, restore missing example IDs through sequential preview/commit. Save
+without a separate Validate action; lint is advisory. Timeout 0 is unlimited with
+legacy -1 compatibility (supersedes the earlier displayed -1 default). Monitor uses
+its own bounded local/SSH transport and visible-only resource probes. Terminal
+session close/navigation stays separate from app tabs; shared help supports held Cmd+Option.
+Consequences: No destructive migration or background daemon. Remote process
+termination after SSH close is server-dependent. Open desktop drafts are preserved.
+Related files: docs/IMPLEMENTATION_PLAN_MONITOR_PLAYBOOKS.md; monitor.rs;
+MonitorView.tsx; AutomationView.tsx; TerminalView.tsx; ShortcutOverlay.tsx.
+
+# ADR-0032: Preserve ASCII capitalization in node IDs
+
+Date: 2026-10-22
+Status: Accepted
+
+Context: The node form accepted RTX3070 while core validation rejected uppercase
+IDs with a generic workspace error. Case-only filenames collide on common macOS filesystems.
+Decision: Node IDs and jump references accept ASCII letters/digits plus internal
+hyphens/underscores, 1–64 characters, starting with a letter/digit. Preserve case
+through CRUD/import/persistence; jump references resolve exactly. Reject case-only
+node duplicates on load and mutation. Keep other entity IDs lowercase. Use static,
+specific format/collision messages and matching browser validation.
+Consequences: No schema migration or automatic rename. Existing lowercase nodes
+remain valid; older applications may reject new uppercase node IDs.
+Related files: crates/ghosh-core/src/workspace/{model,inventory,storage}.rs;
+src/features/nodes/NodeEditor.tsx; docs/WORKSPACE_SCHEMA.md.

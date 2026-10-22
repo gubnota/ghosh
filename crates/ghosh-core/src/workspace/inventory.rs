@@ -2,7 +2,7 @@
 use super::{
     Workspace,
     document::Document,
-    model::{Node, entity_id, invalid},
+    model::{Node, invalid, node_id_collision, validate_node_id},
     storage,
 };
 use crate::{
@@ -140,6 +140,14 @@ impl Workspace {
             NodeChange::Update { node } => {
                 node.validate(&node.id)?;
                 if !self.loaded.nodes.iter().any(|n| n.id == node.id) {
+                    if self
+                        .loaded
+                        .nodes
+                        .iter()
+                        .any(|n| n.id.eq_ignore_ascii_case(&node.id))
+                    {
+                        return Err(node_id_collision());
+                    }
                     return Err(invalid());
                 }
                 let path = format!("{}/{}.toml", manifest.paths.nodes, node.id);
@@ -155,8 +163,14 @@ impl Workspace {
             }
             NodeChange::Remove { id } => (id.clone(), None, true),
         };
-        if !entity_id(&id) {
-            return Err(invalid());
+        validate_node_id(&id)?;
+        if self
+            .loaded
+            .nodes
+            .iter()
+            .any(|node| node.id != id && node.id.eq_ignore_ascii_case(&id))
+        {
+            return Err(node_id_collision());
         }
         let before = self.loaded.nodes.iter().find(|node| node.id == id).cloned();
         // Import replacement must be explicit; create never silently overwrites.

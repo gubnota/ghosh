@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "Failing Multistep Playbook",
+  "cells": [
+    {
+      "id": "ready",
+      "title": "Successful first step",
+      "runtime": "shell",
+      "code": "printf 'Ready\\n'",
+      "timeout_s": 5,
+      "success_check": "true"
+    },
+    {
+      "id": "fail",
+      "title": "Intentional exit code 7",
+      "runtime": "shell",
+      "code": "printf 'Expected example failure\\n' >&2; exit 7",
+      "timeout_s": 5,
+      "success_check": null
+    },
+    {
+      "id": "skipped",
+      "title": "Must not run after failure",
+      "runtime": "shell",
+      "code": "echo 'This should not run'",
+      "timeout_s": 5,
+      "success_check": null
+    }
+  ]
+}

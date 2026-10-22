@@ -1,6 +1,8 @@
 use super::{
     document::Document,
-    model::{Manifest, Node, entity_id, invalid, relative_path},
+    model::{
+        Manifest, Node, entity_id, invalid, node_id_collision, relative_path, validate_node_id,
+    },
 };
 use crate::contracts::{AppError, Cancellation, ErrorCode, Result};
 use cap_std::{
@@ -159,6 +161,7 @@ fn validated_files(files: BTreeMap<String, String>) -> Result<Loaded> {
     let manifest = doc.manifest()?;
     let revision = fingerprint(&files);
     let mut nodes = Vec::new();
+    let mut node_ids = BTreeSet::new();
     let mut stores = BTreeMap::new();
     let mut tunnels = BTreeSet::from(["direct".to_string()]);
     for (path, text) in &files {
@@ -179,12 +182,20 @@ fn validated_files(files: BTreeMap<String, String>) -> Result<Loaded> {
             .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(invalid)?;
-        if !entity_id(file_id) || parsed.ast.get("id").and_then(|v| v.as_str()) != Some(file_id) {
+        if node_file {
+            validate_node_id(file_id)?;
+        } else if !entity_id(file_id) {
             return Err(invalid());
         }
-        if Path::new(path).parent() == Some(Path::new(&manifest.paths.nodes)) {
+        if parsed.ast.get("id").and_then(|v| v.as_str()) != Some(file_id) {
+            return Err(invalid());
+        }
+        if node_file {
             let node: Node = toml_edit::de::from_document(parsed.ast).map_err(|_| invalid())?;
             node.validate(file_id)?;
+            if !node_ids.insert(node.id.to_ascii_lowercase()) {
+                return Err(node_id_collision());
+            }
             nodes.push(node);
         } else if Path::new(path).parent() == Some(Path::new(&manifest.paths.profiles)) {
             let store = parsed
@@ -246,6 +257,7 @@ fn validated_files(files: BTreeMap<String, String>) -> Result<Loaded> {
         revision,
     })
 }
+
 fn config_files(dir: &Dir, model: &Manifest) -> Result<BTreeMap<String, String>> {
     let mut files = BTreeMap::from([("ghosh.toml".into(), read_text(dir, "ghosh.toml")?)]);
     let mut total = files["ghosh.toml"].len();
@@ -542,4 +554,28 @@ pub fn create(parent: &Path, name: &str, cancel: &Cancellation) -> Result<PathBu
         let _ = dir.remove_dir_all(&stage);
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn case_only_node_files_are_rejected_even_on_case_sensitive_filesystems() {
+        let mut files = BTreeMap::from([(
+            "ghosh.toml".into(),
+            "schema=1\n[workspace]\nid='01ARZ3NDEKTSV4RRFFQ69G5FAV'\nname='Names'\ncreated=2026-10-22T00:00:00Z\n[paths]\nnodes='inventory'\n".into(),
+        )]);
+        for id in ["RTX3070", "rtx3070"] {
+            files.insert(
+                format!("inventory/{id}.toml"),
+                format!(
+                    "schema=1\nid='{id}'\nhost='127.0.0.1'\nuser='ops'\n[auth]\nmethod='system'\n"
+                ),
+            );
+        }
+        let error = validated_files(files).err().unwrap();
+        assert_eq!(error.code, ErrorCode::Conflict);
+        assert!(error.message.contains("different capitalization"));
+    }
 }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-system-key-candidates"
+description = "Enables the system_key_candidates command without any pre-configured scope."
+commands.allow = ["system_key_candidates"]
+
+[[permission]]
+identifier = "deny-system-key-candidates"
+description = "Denies the system_key_candidates command without any pre-configured scope."
+commands.deny = ["system_key_candidates"]

@@ -3,7 +3,7 @@ import { Dialog } from "../components/Dialog";
 import { commandReason, searchCommands, type Command } from "./commands";
 
 export function CommandPopup({ dismiss, execute, context }: {
-  dismiss: () => void; execute: (command: Command) => void; context: { desktop: boolean; workspace: boolean; busy: boolean; editable?: boolean; trusted?: boolean };
+  dismiss: () => void; execute: (command: Command) => void; context: { desktop: boolean; workspace: boolean; busy: boolean; runActive?: boolean; editable?: boolean; trusted?: boolean };
 }) {
   const id = useId();
   const [query, setQuery] = useState("");

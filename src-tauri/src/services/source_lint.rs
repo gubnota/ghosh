@@ -9,7 +9,7 @@ pub(crate) fn lint_source(document: AutomationDocument) -> Result<SourceDiagnost
     }
     let mut diagnostics = vec![];
     let engine = match document.kind {
-        AutomationKind::Playbook | AutomationKind::Ansible => {
+        AutomationKind::Playbook | AutomationKind::Ansible | AutomationKind::Notebook => {
             let validation = validate(&document);
             diagnostics.extend(
                 validation

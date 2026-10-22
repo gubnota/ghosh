@@ -319,3 +319,46 @@ fn native_resolution_rechecks_revision_encryption_and_file_identity() {
         fs::read(&encrypted).unwrap().as_slice()
     );
 }
+
+#[test]
+fn system_preview_resolution_pins_contents_without_registry_import() {
+    use ghosh_core::policy::SecretAccess;
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let registry = FileKeyRegistry::open(&root.join("ssh")).unwrap();
+    let access = SecretAccess::authorize(
+        Principal::NativeService,
+        &ulid::Ulid::new().to_string(),
+        true,
+    )
+    .unwrap();
+    for encrypted in [false, true] {
+        let path = fixture(&root, "system", encrypted);
+        let preview = registry
+            .preview(
+                Principal::LocalUi,
+                request(&path, KeyStorage::Reference),
+                &Probe,
+            )
+            .unwrap();
+        assert_eq!(preview.encrypted, encrypted);
+        assert_eq!(
+            registry
+                .resolve_preview(&access, &preview, &Probe)
+                .unwrap()
+                .as_slice(),
+            fs::read(&path).unwrap().as_slice()
+        );
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(registry.resolve_preview(&access, &preview, &Probe).is_err());
+        fixture(&root, "system", !encrypted);
+        assert!(registry.resolve_preview(&access, &preview, &Probe).is_err());
+    }
+    assert!(
+        registry
+            .snapshot(Principal::LocalUi)
+            .unwrap()
+            .keys
+            .is_empty()
+    );
+}

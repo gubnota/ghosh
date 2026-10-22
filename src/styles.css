@@ -340,3 +340,43 @@ td, th { vertical-align: middle; }
 .editor-expanded .monaco-host, .editor-expanded .source-editor { flex:1; min-height:180px; max-height:none; height:100%; }
 .editor-expanded .form-grid, .editor-expanded label[for="automation-example"], .editor-expanded #automation-example { display:none; }
 .source-workbench .source-editor { width:100%; }
+
+.notebook { min-width: 0; display: grid; gap: 1rem; }
+.notebook-cell { min-width: 0; border: 1px solid var(--border); padding: 1rem; border-radius: .5rem; }
+.notebook-cell pre, .run-monitor pre { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; max-height: 18rem; padding: .75rem; background: var(--bg); }
+.notebook-cell .monaco-host { height: 220px; }
+.notebook-expanded .monaco-host { height: 60vh; }
+.notebook label, .notebook select { display: block; }
+.notebook textarea { width: 100%; }
+.run-monitor { white-space: normal; position: fixed; right: 1rem; bottom: 3rem; z-index: 30; width: min(440px, calc(100vw - 2rem)); max-height: min(75dvh, 680px); overflow: auto; padding: 1rem; border: 1px solid var(--cyan); border-radius: .6rem; background: var(--panel); box-shadow: 0 8px 36px #0008; font-size: .85rem; }
+.run-monitor p { overflow-wrap: anywhere; }
+.run-monitor progress { width: 100%; accent-color: var(--cyan); }
+.run-monitor pre { height: 10rem; }
+@media (max-height: 600px) { .run-monitor { bottom: 2rem; max-height: 65dvh; } }
+
+.playbook-dialog.editor-expanded { overflow-y: auto; display: block; }
+.playbook-dialog.editor-expanded .form-grid { display: grid; }
+.playbook-dialog.editor-expanded .notebook .monaco-host { height: 220px; min-height: 220px; }
+.playbook-dialog.editor-expanded .notebook .source-editor { height: 220px; }
+.playbook-maximized { position: fixed; inset: 0; z-index: 60; margin: 0; border-radius: 0; overflow-y: auto; background: var(--bg); padding: 1rem; }
+.playbook-dialog.editor-expanded { width: 100vw; height: 100dvh; border-radius: 0; }
+.step-drag { cursor: grab; touch-action: none; font-size: 1.3rem; }
+.step-drag:active { cursor: grabbing; }
+
+.step-maximized { position: fixed; inset: 0; z-index: 70; overflow-y: auto; background: var(--bg); border-radius: 0; margin: 0; }
+.step-maximized .monaco-host, .playbook-dialog.editor-expanded .step-maximized .monaco-host { height: 55dvh; min-height: 240px; }
+.step-maximized .source-editor, .playbook-dialog.editor-expanded .step-maximized .source-editor { height: 55dvh; }
+
+.playbook-drop { border: 1px dashed var(--border); border-radius: 6px; padding: 18px; margin-bottom: 16px; color: var(--muted); }
+
+.step-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: end; }
+.step-settings > label { display: grid; grid-template-rows: 1fr auto; align-self: stretch; gap: 8px; margin: 0; }
+.step-settings input, .step-settings select { height: 40px; margin: 0; }
+
+.terminal-session-tab { display: inline-flex; align-items: center; }
+.terminal-session-tab > button:last-child { padding: 6px; }
+.shortcut-overlay { margin: auto; position: fixed; inset: 20px; max-width: 1000px; max-height: calc(100dvh - 40px); overflow: auto; padding: 24px; background: var(--panel, #152130); color: inherit; border: 1px solid var(--border, #40516a); border-radius: 12px; box-shadow: 0 16px 60px #0009; }
+
+.step-settings .select-trigger{height:40px;min-height:40px}
+
+.monitor-resources{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.monitor-resources meter{display:block;width:100%;margin-top:8px}.monitor-output{white-space:pre-wrap;overflow-wrap:anywhere;max-height:50vh;overflow:auto}#monitor-command{width:100%;min-height:80px}

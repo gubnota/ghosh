@@ -8,7 +8,7 @@
 | crates/ghosh-core/src/workspace/inventory.rs, identity.rs | Revisioned node CRUD, file identities and explicit schema migration |
 | crates/ghosh-core/src/automation.rs, workspace/automation.rs | Inert source validation/catalog, revision-bound authoring |
 | src-tauri/src/services/automation.rs, source_lint.rs | Local authoring bridge and bounded non-executing shell/Python/YAML diagnostics |
-| src/features/automation | Catalogs, offline Monaco editor/runtime, checked multi-step + Ansible examples, Run dialog, live progress/footer and JSON export |
+| src/features/automation | Catalogs, offline Monaco editor/runtime, checked multi-step + Ansible examples, Run dialog, Multistep Playbook authoring/output and transfer, modeless monitor, cleanup and JSON export |
 | src/features/comfy/ComfyDialog.tsx, playbook.ts | Keyboard recipe form and standard Ansible generator, no parallel execution engine |
 | src-tauri/src/services/ansible.rs, ansible_bridge.py | Native reviewed identities, private upstream Runner invocation, filtered NDJSON events |
 | crates/ghosh-core/src/runs.rs | Sequential check/apply/verify engine, handler/retry rules, bounded result DTOs |
@@ -27,9 +27,9 @@
 | crates/ghosh-core/src/policy.rs | Principals, edit/secret authorization, required approvals |
 | crates/ghosh-core/src/secrets.rs | SecretRef/SecretValue/SecretStore boundary |
 | crates/ghosh-core/src/workspace/mod.rs | Workspace create/open/snapshot/rename/reload/trust |
-| crates/ghosh-core/src/workspace/model.rs | Manifest/node projections, identity/path/reference checks |
+| crates/ghosh-core/src/workspace/model.rs | Manifest/node projections, case-preserving node IDs, identity/path/reference checks |
 | crates/ghosh-core/src/workspace/document.rs | Lossless TOML AST, safe patches, secret-field rejection |
-| crates/ghosh-core/src/workspace/storage.rs | Anchored filesystem, leases, revision hashing, atomic publication |
+| crates/ghosh-core/src/workspace/storage.rs | Anchored filesystem, case-only node collision checks, leases, revision hashing, atomic publication |
 | crates/ghosh-core/src/workspace/watch.rs | Bounded debounced native watcher and revision fallback |
 | crates/ghosh-core/tests/workspace.rs | 24 filesystem/schema/conflict/trust/watcher behavior tests |
 | crates/ghosh-core/tests/policy.rs | Three policy/reference/redaction tests |
@@ -46,9 +46,9 @@
 | src/app/useOperations.ts | Subscribe-before-fetch operation snapshots and sequence reconciliation |
 | src/features/operations | Native jobs and approval review/audit views |
 | src/features/nodes, src/features/settings | Node CRUD/editor and local appearance/keyboard settings |
-| src/features/keys | Key library and workspace-identity migration dialogs |
+| src/features/keys | Key library and explicit workspace-identity migration dialogs |
 | src/features/terminal/TerminalView.tsx | xterm sessions, split/search/paste review and terminal focus |
-| tests/ui/shell.spec.ts, playwright.config.ts | 28 sequential browser presentation tests with explicit IPC fixtures |
+| tests/ui/shell.spec.ts, playwright.config.ts | 38 sequential browser presentation tests with explicit IPC fixtures |
 | src/app/ipc.ts | Typed commands and event subscriptions |
 | src/features/workspace/WorkspaceView.tsx | Name editing, inventory, local approval/pause, conflict/reload/details |
 | src/styles.css | Nightfly responsive keyboard-first desktop presentation |
@@ -105,3 +105,15 @@
 - Extend current ComfyUI generator/Ansible adapter: GPU acceptance, catalog and lifecycle orchestration (M6).
 - ghosh-mcp and ghosh-cli: shared-core adapters and running-app attachment (M7).
 - Cross-service/native conformance fixtures will be added with their owning services.
+
+- NotebookEditor.tsx owns full-window step authoring and drag ordering; RunMonitor.tsx displays modeless output.
+- examples/playbooks/ contains importable success, failure and timeout examples.
+- IMPLEMENTATION_PLAN_PLAYBOOK_DEFAULTS.md records the approved defaults/transfer increment.
+- IMPLEMENTATION_PLAN_NOTEBOOK_RUNS.md records the approved run/key/notebook increment.
+
+## Monitor and shortcut ownership
+- crates/ghosh-core/src/monitor.rs: ephemeral DTOs, metric parsing and probe command.
+- src-tauri/src/services/monitor.rs: bounded session, local child groups and sampling lifecycle.
+- crates/ghosh-ssh/src/lib.rs: independent non-PTY SSH log/probe channels.
+- src/features/monitor/MonitorView.tsx: explicit connection/commands and live readings.
+- src/components/ShortcutOverlay.tsx: shared shortcut table and modifier overlay.

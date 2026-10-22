@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-monitor-close"
+description = "Enables the monitor_close command without any pre-configured scope."
+commands.allow = ["monitor_close"]
+
+[[permission]]
+identifier = "deny-monitor-close"
+description = "Denies the monitor_close command without any pre-configured scope."
+commands.deny = ["monitor_close"]

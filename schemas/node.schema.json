@@ -91,6 +91,7 @@
     "AuthMethod": {
       "type": "string",
       "enum": [
+        "system",
         "key",
         "agent",
         "password"

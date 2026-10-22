@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-monitor-open"
+description = "Enables the monitor_open command without any pre-configured scope."
+commands.allow = ["monitor_open"]
+
+[[permission]]
+identifier = "deny-monitor-open"
+description = "Denies the monitor_open command without any pre-configured scope."
+commands.deny = ["monitor_open"]

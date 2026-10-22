@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notebook-parse"
+description = "Enables the notebook_parse command without any pre-configured scope."
+commands.allow = ["notebook_parse"]
+
+[[permission]]
+identifier = "deny-notebook-parse"
+description = "Denies the notebook_parse command without any pre-configured scope."
+commands.deny = ["notebook_parse"]

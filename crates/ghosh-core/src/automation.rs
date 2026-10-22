@@ -11,6 +11,7 @@ pub const AUTOMATION_ID_HELP: &str = "ID must use 1–64 lowercase letters, digi
 #[serde(rename_all = "snake_case")]
 pub enum AutomationKind {
     Playbook,
+    Notebook,
     Ansible,
     Shell,
     Python,
@@ -20,6 +21,7 @@ impl AutomationKind {
     pub fn extension(self) -> &'static str {
         match self {
             Self::Playbook => "yml",
+            Self::Notebook => "steps.yml",
             Self::Ansible => "ansible.yml",
             Self::Shell => "sh",
             Self::Python => "py",
@@ -149,6 +151,86 @@ pub fn parse_playbook(source: &str) -> Result<Playbook> {
     }
     Ok(book)
 }
+/// Notebook cells are independent processes, never an implicit persistent kernel.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct Notebook {
+    pub schema: u32,
+    pub name: String,
+    pub cells: Vec<NotebookCell>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct NotebookCell {
+    pub id: String,
+    pub title: String,
+    pub runtime: AutomationKind,
+    pub code: String,
+    #[serde(default = "default_step_timeout")]
+    pub timeout_s: i32,
+    #[serde(default)]
+    pub success_check: Option<String>,
+}
+fn default_step_timeout() -> i32 {
+    30
+}
+pub fn parse_notebook(source: &str) -> Result<Notebook> {
+    let problem = |message: &str| AppError {
+        code: ErrorCode::InvalidDocument,
+        message: message.into(),
+    };
+    if source.len() > MAX_SOURCE || source.contains('\0') {
+        return Err(problem(
+            "Playbook source must be at most 256 KiB without NUL characters.",
+        ));
+    }
+    // Do not include parser excerpts: source may contain private data.
+    let book: Notebook = serde_yaml_ng::from_str(source).map_err(|_| problem("Playbook structure is invalid. Use schema, name and cells; each step supports id, title, runtime, code, timeout_s and success_check."))?;
+    if book.schema != 1 {
+        return Err(problem("Playbook schema must be 1."));
+    }
+    if book.name.trim().is_empty() || book.name.len() > 120 {
+        return Err(problem("Playbook name must contain 1–120 bytes."));
+    }
+    if book.cells.is_empty() || book.cells.len() > 256 {
+        return Err(problem("A Playbook must contain 1–256 steps."));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    for (index, cell) in book.cells.iter().enumerate() {
+        let field = if !super::workspace::model::entity_id(&cell.id) {
+            Some(
+                "ID must start with a lowercase letter or digit and contain at most 64 lowercase letters, digits, hyphens or underscores.",
+            )
+        } else if !ids.insert(&cell.id) {
+            Some("ID duplicates another step.")
+        } else if cell.title.trim().is_empty() || cell.title.len() > 120 {
+            Some("Title must contain 1–120 bytes.")
+        } else if !matches!(
+            cell.runtime,
+            AutomationKind::Shell | AutomationKind::Python | AutomationKind::Deno
+        ) {
+            Some("Runtime must be shell, python or deno.")
+        } else if !command_valid(&cell.code) {
+            Some("Code must be nonempty, at most 64 KiB and contain no NUL characters.")
+        } else if !(-1..=3600).contains(&cell.timeout_s) {
+            Some("Timeout must be 0 (no timeout), 1–3600 seconds, or legacy -1 (no timeout).")
+        } else if cell
+            .success_check
+            .as_ref()
+            .is_some_and(|s| !command_valid(s))
+        {
+            Some(
+                "Success check must be null or nonempty code of at most 64 KiB without NUL characters.",
+            )
+        } else {
+            None
+        };
+        if let Some(field) = field {
+            return Err(problem(&format!("Step {}: {field}", index + 1)));
+        }
+    }
+    Ok(book)
+}
 pub fn parse_ansible(source: &str) -> Result<AnsibleProject> {
     if source.len() > MAX_SOURCE {
         return Err(invalid());
@@ -215,6 +297,10 @@ pub fn validate(document: &AutomationDocument) -> AutomationValidation {
     }
     if result.issues.is_empty() {
         match document.kind {
+            AutomationKind::Notebook => match parse_notebook(&document.source) {
+                Ok(book) => { result.name = book.name; result.task_count = book.cells.len() as u32; }
+                Err(error) => result.issues.push(error.message),
+            },
             AutomationKind::Playbook if standard_playbook(&document.source).is_some() => {
                 let (name, count) = standard_playbook(&document.source).unwrap();
                 result.name = name; result.task_count = count;

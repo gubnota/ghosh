@@ -1,4 +1,4 @@
-import type { RunReport, RunRequest } from "../generated/contracts";
+import type { RunReport, RunRequest, RunCleanupRequest, Notebook } from "../generated/contracts";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { NodeConnectionRequest, NodeConnectionPreview, NodeConnectionCommit, NodeConnectionResult, NodeTerminalRequest } from "../generated/contracts";
@@ -6,8 +6,18 @@ import type { TerminalSession, TerminalPacket, TerminalSize } from "../generated
 import type { KeyGenerateRequest, KeyRelinkRequest, WorkspaceKeyRequest, WorkspaceKeyPreview, WorkspaceKeyCommit, NodeIdentityRequest, IdentityPreview, KeysSnapshot, KeyImportRequest, KeyImportPreview, KeyCommitRequest, KeyRegistryRequest } from "../generated/contracts";
 import type { Node, NodeMutationRequest, NodeCommitRequest, NodeChangePreview, AppError, ApprovalDecisionRequest, OperationsSnapshot, CreateRequest, RecentWorkspace, RenameRequest, RevisionRequest, TrustRequest, WorkspaceEvent, WorkspaceSnapshot } from "../generated/contracts";
 import type { SourceDiagnostics, AutomationSummary, AutomationDocument, AutomationReadRequest, AutomationMutation, AutomationPreview, AutomationCommit } from "../generated/contracts";
+import type { MonitorOpen, MonitorPacket, MonitorSession } from "../generated/contracts";
 export const desktop = isTauri();
 export const api = {
+  monitorOpen: (request: MonitorOpen) => invoke<MonitorSession>("monitor_open", { request }),
+  monitorPoll: (id: string, visible: boolean) => invoke<MonitorPacket>("monitor_poll", { id, visible }),
+  monitorStart: (id: string, command: string) => invoke<void>("monitor_start", { id, command }),
+  monitorClose: (id: string) => invoke<void>("monitor_close", { id }),
+  playbookImport: (path: string | null = null) => invoke<AutomationDocument | null>("playbook_import", { path }),
+  playbookExport: (document: AutomationDocument) => invoke<boolean>("playbook_export", { document }),
+  notebookParse: (source: string) => invoke<Notebook>("notebook_parse", { source }),
+  runsCleanup: (request: RunCleanupRequest) => invoke<number>("runs_cleanup", { request }),
+  systemKeyCandidates: () => invoke<KeyImportPreview[]>("system_key_candidates"),
   runStart: (request: RunRequest) => invoke<RunReport>("run_start", { request }),
   runs: (request: RevisionRequest) => invoke<RunReport[]>("runs_list", { request }),
   runStop: (id: string) => invoke<void>("run_stop", { id }),
@@ -60,5 +70,6 @@ export const api = {
 };
 export function errorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "code" in error && "message" in error) return (error as AppError).message;
+  if (error instanceof Error) return error.message;
   return "Ghosh could not complete the operation. Try reopening the workspace.";
 }

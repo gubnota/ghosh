@@ -61,7 +61,11 @@ pub fn select_identity(
         status: None,
         registry_revision: keys.revision.clone(),
     };
-    let choice = match node.auth.method {
+    let choice = match node.effective_auth_method() {
+        AuthMethod::System => {
+            result.source = "system".into();
+            None
+        }
         AuthMethod::Agent => {
             result.source = "agent".into();
             None

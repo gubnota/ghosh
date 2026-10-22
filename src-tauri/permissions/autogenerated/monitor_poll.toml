@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-monitor-poll"
+description = "Enables the monitor_poll command without any pre-configured scope."
+commands.allow = ["monitor_poll"]
+
+[[permission]]
+identifier = "deny-monitor-poll"
+description = "Denies the monitor_poll command without any pre-configured scope."
+commands.deny = ["monitor_poll"]

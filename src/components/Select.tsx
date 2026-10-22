@@ -82,7 +82,7 @@ export const Select = forwardRef<HTMLButtonElement, Props>(function Select({ val
         }
       }}><span className="select-value" title={options[selected]?.label}>{options[selected]?.label || "Choose…"}</span><ChevronDown aria-hidden="true" className="icon select-chevron" /></button>
     <div ref={menu} id={listId} className="select-menu" role="listbox" popover="manual" aria-label={props["aria-label"] || "Options"}
-      onPointerDown={event => event.preventDefault()}>
+      onPointerDown={event => event.preventDefault()} onClick={event => event.preventDefault()}>
       {options.map((option, index) => <div key={option.value} id={`${uid}-${index}`} data-index={index} role="option" aria-selected={index === selected} aria-disabled={option.disabled || undefined}
         className={`select-option ${active === index ? "active" : ""}`} onPointerMove={() => { if (!option.disabled) setActive(index); }} onClick={() => choose(index)}>
         <span>{option.label}</span>{index === selected && <Check className="icon" aria-hidden="true" />}

@@ -4,7 +4,7 @@ use ghosh_core::{
     automation::*,
     contracts::*,
     operations::{JobKind, OperationsSnapshot},
-    runs::{RunReport, RunRequest},
+    runs::{RunCleanupRequest, RunReport, RunRequest},
     ssh::*,
     ssh_keys::*,
     terminal::*,
@@ -38,6 +38,71 @@ async fn run<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) 
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|_| AppError::new(ErrorCode::Internal))?
+}
+#[tauri::command]
+pub async fn playbook_import(
+    window: WebviewWindow,
+    path: Option<String>,
+) -> Result<Option<AutomationDocument>> {
+    caller(&window)?;
+    let path = match path {
+        Some(path) => std::path::PathBuf::from(path),
+        None => {
+            let Some(file) = rfd::AsyncFileDialog::new()
+                .add_filter("Multistep Playbook", &["yml", "yaml", "json"])
+                .pick_file()
+                .await
+            else {
+                return Ok(None);
+            };
+            file.path().to_path_buf()
+        }
+    };
+    run(move || crate::services::automation::import_playbook(&path).map(Some)).await
+}
+#[tauri::command]
+pub async fn playbook_export(window: WebviewWindow, document: AutomationDocument) -> Result<bool> {
+    caller(&window)?;
+    parse_notebook(&document.source)?;
+    if document.kind != AutomationKind::Notebook
+        || !ghosh_core::workspace::model::entity_id(&document.id)
+    {
+        return Err(AppError::new(ErrorCode::InvalidDocument));
+    }
+    let Some(file) = rfd::AsyncFileDialog::new()
+        .set_file_name(format!("{}.steps.yml", document.id))
+        .add_filter("Multistep Playbook", &["yml"])
+        .save_file()
+        .await
+    else {
+        return Ok(false);
+    };
+    file.write(document.source.as_bytes()).await?;
+    Ok(true)
+}
+#[tauri::command]
+pub async fn notebook_parse(window: WebviewWindow, source: String) -> Result<Notebook> {
+    caller(&window)?;
+    run(move || parse_notebook(&source)).await
+}
+#[tauri::command]
+pub async fn runs_cleanup(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+    request: RunCleanupRequest,
+) -> Result<usize> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.runs_cleanup(request)).await
+}
+#[tauri::command]
+pub async fn system_key_candidates(
+    window: WebviewWindow,
+    state: State<'_, Arc<Services>>,
+) -> Result<Vec<KeyImportPreview>> {
+    caller(&window)?;
+    let service = state.inner().clone();
+    run(move || service.system_key_candidates()).await
 }
 #[tauri::command]
 pub async fn run_start(
@@ -571,4 +636,47 @@ mod tests {
             assert!(validate_caller(label, scheme, host, port).is_err());
         }
     }
+}
+
+#[tauri::command]
+pub async fn monitor_open(
+    window: WebviewWindow,
+    service: State<'_, Arc<Services>>,
+    request: ghosh_core::monitor::MonitorOpen,
+) -> Result<ghosh_core::monitor::MonitorSession> {
+    caller(&window)?;
+    let service = Arc::clone(service.inner());
+    run(move || service.monitor_open(request)).await
+}
+#[tauri::command]
+pub async fn monitor_poll(
+    window: WebviewWindow,
+    service: State<'_, Arc<Services>>,
+    id: String,
+    visible: bool,
+) -> Result<ghosh_core::monitor::MonitorPacket> {
+    caller(&window)?;
+    let service = Arc::clone(service.inner());
+    run(move || service.monitor_poll(id, visible)).await
+}
+#[tauri::command]
+pub async fn monitor_start(
+    window: WebviewWindow,
+    service: State<'_, Arc<Services>>,
+    id: String,
+    command: String,
+) -> Result<()> {
+    caller(&window)?;
+    let service = Arc::clone(service.inner());
+    run(move || service.monitor_start(id, command)).await
+}
+#[tauri::command]
+pub async fn monitor_close(
+    window: WebviewWindow,
+    service: State<'_, Arc<Services>>,
+    id: String,
+) -> Result<()> {
+    caller(&window)?;
+    let service = Arc::clone(service.inner());
+    run(move || service.monitor_close(id)).await
 }
